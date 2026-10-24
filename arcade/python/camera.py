@@ -31,11 +31,16 @@ class ThirdPersonCamera:
         self.pitch = math.radians(tilt.START_PITCH_DEG)
         self.since_tilt = 0.0  # s since the last tilt look input
 
-    def turn(self, inp, dt):
-        """Tilt look (before the PC moves)."""
+    def turn(self, inp, dt, on_boss=False):
+        """Tilt look (before the PC moves). On the boss's brow it can look further down; after letting go
+        a pitch below the riding limit eases back up instead of jumping."""
         self.yaw -= inp.yaw_rate * dt  # turning right lowers yaw (see right())
-        lo, hi = math.radians(tilt.MIN_PITCH_DEG), math.radians(tilt.MAX_PITCH_DEG)
-        self.pitch = min(hi, max(lo, self.pitch + inp.pitch_rate * dt))
+        lo = math.radians(tilt.HOOKED_MIN_PITCH_DEG if on_boss else tilt.MIN_PITCH_DEG)
+        hi = math.radians(tilt.MAX_PITCH_DEG)
+        pitch = self.pitch + inp.pitch_rate * dt
+        if pitch < lo:
+            pitch = min(lo, max(pitch, self.pitch) + math.radians(tilt.MAX_PITCH_RATE_DEG) * dt)
+        self.pitch = min(hi, pitch)
         self.since_tilt = 0.0 if inp.yaw_rate else self.since_tilt + dt
 
     def follow(self, player, dt):

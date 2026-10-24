@@ -143,6 +143,11 @@ class Player:
         return self.hook == HOOKED
 
     @property
+    def on_boss(self):
+        """Pulled in by the hook or clinging to the brow."""
+        return self.hook in (PULLING, HOOKED)
+
+    @property
     def mounted(self):
         return self.hook not in (PULLING, HOOKED) and not self.airborne
 
@@ -199,7 +204,7 @@ class Player:
         self.since_land += dt
         self.loose_time += dt
         if inp.pressed & g3d.BTN_C:
-            self._hook_button(aim)
+            self._hook_button(aim, boss)
         if self.hook in (PULLING, HOOKED):
             pass  # carried by the hook
         elif self.airborne:
@@ -251,7 +256,7 @@ class Player:
             self.since_land, self.loose = 0.0, None  # straight into the saddle
 
     # ---- hook -------------------------------------------------------------------------------
-    def _hook_button(self, aim):
+    def _hook_button(self, aim, boss):
         if self.hook in (PULLING, HOOKED):  # let go and drop; from here the PC point is the hooves again
             ox, oy, oz = self._rider_origin()
             self.x, self.y, self.z = ox, oy - MOUNT_DROP, oz
@@ -267,7 +272,8 @@ class Player:
         if aim.hook is not None:
             self.hook_bone = aim.hook.collider.bone
             self.hook_to = aim.hook.point
-            self.hook_local = None  # resolved against the bone when the hook lands
+            bones, _ = boss.poses()  # the anchor rides the bone, so the hook lands on the brow wherever it moved
+            self.hook_local = rig.transform(rig.inverse(bones[self.hook_bone]), self.hook_to)
             self.yaw = math.atan2(self.hook_to[0] - self.x, self.hook_to[2] - self.z)
         else:
             self.hook_bone = -1
@@ -286,11 +292,11 @@ class Player:
         self.hook_time += dt
         t = min(1.0, self.hook_time / HOOK_FLIGHT)
         if self.hook == FLYING:
+            if self.hook_bone >= 0:
+                self.hook_to = self.anchor(boss)
             self.hook_head = tuple(a + (b - a) * t for a, b in zip(self.hook_from, self.hook_to))
             if t >= 1.0:
                 if self.hook_bone >= 0:
-                    bones, _ = boss.poses()
-                    self.hook_local = rig.transform(rig.inverse(bones[self.hook_bone]), self.hook_to)
                     # The rider leaves the saddle: the horse runs on and fades out; the PC point becomes the feet.
                     self.loose, self.loose_time = (self.x, self.y, self.z, self.yaw, max(self.speed, 0.6)), 0.0
                     self.x, self.y, self.z = self._rider_origin()

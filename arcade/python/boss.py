@@ -39,17 +39,20 @@ SHAKE_AFTER = 2.5                 # s hooked on before it shakes
 THROW_PHASE = 73                  # shake phase of the throw event; JUMP OFF is shown until then
 KNEEL_HOLD = 12.0                 # s down on its knees after the kneel animation
 KNEEL_DAMAGE = 4                  # damage after rising that brings it down again
-ATTACK_INTERVAL = (5.0, 8.0)      # s of standing still between attacks
+ATTACK_INTERVAL = (0.5, 1.5)      # s of standing still between attacks: with the turn, one attack about every 5 s
 TURN_RATE = math.radians(25)      # rad/s while turning to attack
 FACING = math.radians(10)         # close enough to the PC to strike
-MAX_TURN = 3.0                    # s; strikes anyway after turning this long
-RECOVER = 1.0                     # s standing still after an attack
+MAX_TURN = 1.5                    # s; strikes anyway after turning this long
+RECOVER = 0.5                     # s standing still after an attack
 FLASH_SECONDS = 0.1               # hit_slot flash (two frames at 20 Hz)
 FOOT_CLEARANCE = 0.3              # m added to a shin's radius on the ground
 PC_CENTRE = 0.9                   # m above the PC's feet, for hit events
 SHOCKWAVE_RADIUS = 14.0           # m; the ring stops here, so standing farther out dodges it
 RING_MESH_RADIUS = 1.0            # m, outer radius of shockwave_ring at scale 1
 RING_LIFT = 0.2                   # m above the ground under the boss, so terrain bumps don't swallow the ring
+HOOK_POINTS = (("root", (0.0, 4.0, 2.4)),   # the top of the shoulder hump, on the back (m in the bone's frame)
+               ("head", (0.0, 0.9, 1.15)))  # the brow, just in front of the stone cap
+HOOK_RADIUS = 1.0                 # m; aiming this close to a hook point hooks it
 
 STANDING, TURNING, STRIKING, SHAKING, KNEELING, RISING, EXECUTED = (
     "standing", "turning", "striking", "shaking", "kneeling", "rising", "executed")
@@ -247,7 +250,7 @@ class Boss:
                 x, _, z = rig.transform(bones[event["bone_index"]], (0, 0, 0))
                 self.waves.append([x, world.terrain_height(self.scene, x, z), z, 0.0, event["speed"],
                                    event.get("dmg", 1)])
-            elif kind == "throw" and player.hook in ("pulling", "hooked"):
+            elif kind == "throw" and player.on_boss:
                 dx, dz = player.x - self.x, player.z - self.z
                 dist = math.hypot(dx, dz) or 1.0
                 player.thrown((dx / dist, dz / dist), event.get("dmg", 1))
@@ -284,6 +287,18 @@ class Boss:
     def colliders(self):
         bones, slots = self.poses()
         return collide.boss_colliders(self.rig, bones, slots, self.alive, self.variants)
+
+    def hook_targets(self):
+        """The only places the hook catches, the back and the brow, as spheres around each point
+        (the rig's hookable flags are not used)."""
+        bones, _ = self.poses()
+        names = [b["name"] for b in self.rig["bones"]]
+        out = []
+        for name, point in HOOK_POINTS:
+            bone = names.index(name)
+            p = rig.transform(bones[bone], point)
+            out.append(collide.Collider("hook", "sphere", p, p, HOOK_RADIUS, bone, hookable=True))
+        return out
 
     def feet(self):
         """Ground circles (x, z, r) the PC cannot enter: the lower ends of the shins."""

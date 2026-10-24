@@ -183,7 +183,7 @@ class Game:
             return
         self.hint = max(0.0, self.hint - dt)
         self.shake_time = max(0.0, self.shake_time - dt)
-        self.camera.turn(inp, dt)
+        self.camera.turn(inp, dt, self.player.on_boss)
         self.boss.update(dt, self.player)
         if self.boss.shake:
             self.shake, self.shake_time, self.boss.shake = self.boss.shake, SHAKE_SECONDS, 0.0
@@ -191,7 +191,8 @@ class Game:
             self.finisher, self.state = Finisher(self), EXECUTE  # B finishes instead of shooting
             return
         colliders = self.boss.colliders()
-        self.aim = aiming.compute(self.camera.view(self.player, self.scene), colliders, self.player.hand())
+        self.aim = aiming.compute(self.camera.view(self.player, self.scene), colliders, self.player.hand(),
+                                  self.boss.hook_targets())
         self.player.update(inp, self.camera, dt, self.boss, self.aim, colliders)
         self.camera.follow(self.player, dt)
         for _, pos, tint in self.boss.broken:
@@ -204,7 +205,8 @@ class Game:
         """The finisher cutscene (finisher.py); no input until the victory screen."""
         self.shake_time = max(0.0, self.shake_time - dt)
         done = self.finisher.update(dt)
-        self.player._advance(dt, self.boss)  # debris and sparks keep moving
+        if self.boss.shake:
+            self.shake, self.shake_time, self.boss.shake = self.boss.shake, SHAKE_SECONDS, 0.0
         for _, pos, tint in self.boss.broken:
             self.player.debris(pos, tint)
         self.boss.broken.clear()
@@ -286,4 +288,7 @@ class Game:
         else:
             hud.state, hud.msg = g3d.STATE_PAUSED, MSG_MISSING
         objects = self.boss.objects() + self.player.objects()  # rings first: MAX_OBJ cuts the tail
-        return Frame(view, objects, hud, self.rigs(), self.player.hook_block(), flags)
+        hook = self.player.hook_block()
+        if self.state == EXECUTE:  # the hook is in the rider's hand, not on a rope
+            objects, hook = (self.finisher.objects() + self.player.objects())[:g3d.MAX_OBJ], g3d.Hook()
+        return Frame(view, objects, hud, self.rigs(), hook, flags)

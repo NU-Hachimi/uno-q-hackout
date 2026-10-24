@@ -271,7 +271,7 @@ def test_close_pc_gets_the_stomp_and_the_ring_hurts():
     pc = Player(scene, x=0.0, z=-5.0)  # under the boss's chest
     boss.timer = 0.0
     attack, hurt_at = None, None
-    for i in range(200):
+    for i in range(70):  # the stomp lands at 1.6 s and its ring is gone 1.2 s later, before the next attack
         boss.update(0.05, pc)
         attack = attack or boss.attack
         if pc.hp < 5 and hurt_at is None:

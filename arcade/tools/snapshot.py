@@ -149,15 +149,15 @@ def main():
 
     # Boss attacks on a fresh round (same seed, so the same parts as scene.bin).
     game = Game(scene, seed=7)
-    run("19_0_start", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A)])
+    run("19_0_start", skip_intro)
     boss, p = game.boss, game.player
     p.x, p.z = 0.0, -6.0  # by the forelegs: close enough for the stomp
     boss.timer = 0.0
     run_until("19_1_stomp_rears", lambda: boss.attack == "rear_stomp" and boss.phase() > 120)
     run_until("19_2_stomp_ring_close", lambda: boss.waves and boss.waves[0][3] > 7.0)
     boss.timer = 99.0  # no ground attacks while the hook frames are taken
-    hump = next(c for c in boss.colliders() if c.hookable).centre()
-    p.x, p.z = hump[0] + 12, hump[2]  # from the side: the standing boss's head hides the hump from the front
+    hump = boss.hook_targets()[0].centre()
+    p.x, p.z = hump[0] + 12, hump[2]  # from the side
     for _ in range(8):  # the camera orbits with its pitch, so converge on the direction from where it ends up
         v = game.camera.view(p, scene)
         dx, dy, dz = hump[0] - v.x, hump[1] - v.y, hump[2] - v.z
@@ -175,21 +175,22 @@ def main():
 
     # The finisher: every part broken, hooked on the shoulder hump, then B.
     import rig as rigmath  # noqa: E402
-    from finisher import SHATTER  # noqa: E402
     for slot in boss.parts:
         boss.damage(slot, 99)
     boss.broken.clear()
     run_until("22_0_standing_again", lambda: boss.state == "standing", limit=400)
-    hump = next(c for c in boss.colliders() if c.hookable)
+    hump = boss.hook_targets()[0]
     bones, _ = boss.poses()
-    top = (hump.centre()[0], hump.centre()[1] + hump.r, hump.centre()[2])
     p.hook, p.hook_bone = "hooked", hump.bone
-    p.hook_local = rigmath.transform(rigmath.inverse(bones[hump.bone]), top)
-    p.x, p.y, p.z = top
+    p.hook_local = rigmath.transform(rigmath.inverse(bones[hump.bone]), hump.centre())
+    p.x, p.y, p.z = hump.centre()
     run("22_1_finish_prompt", [raw()])
-    run("23_execute_climb", [raw(pressed=g3d.BTN_B)] + [raw()] * 12)
-    run_until("24_execute_strike", lambda: game.finisher.struck >= 2)
-    run_until("25_execute_fall", lambda: game.finisher.time > SHATTER + 1.6)
+    run("23_execute_leap", [raw(pressed=g3d.BTN_B)] + [raw()] * 8)
+    run_until("24_execute_windup", lambda: game.finisher.phase > 110)
+    run_until("24_execute_hit", lambda: game.finisher.frozen > 0)
+    run_until("25_execute_twist", lambda: game.finisher.phase > 180)
+    run_until("25_execute_shatter", lambda: game.finisher.after is not None and game.finisher.after > 0.15)
+    run_until("25_execute_drop", lambda: game.finisher.dropped and game.player.vy < -3)
     run_until("26_victory", lambda: game.state == "win")
     print(f"wrote {out}/scene.bin and {seq} frames")
 

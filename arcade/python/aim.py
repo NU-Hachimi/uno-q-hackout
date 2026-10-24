@@ -7,6 +7,8 @@ import camera
 import collide
 
 ASSIST_DEG = 4.0                     # snap to a target within this angle of the screen centre
+HOOK_ASSIST_DEG = 6.0                # hook points are small: the hook snaps to them from a little further out
+HOOK_SURFACE = 1.5                   # m; the boss's own surface this close before a hook point does not block it
 FOCAL = 120 / math.tan(math.radians(camera.FOV / 2))  # px; the MCU's projection (fovX, 240 wide)
 MAX_OFFSET = 254                     # px; the frame packet sends the offset in 2 px units (i8)
 FLAG_PART, FLAG_HOOK = 1, 2          # reticle_flags (api.md §3.3)
@@ -68,8 +70,17 @@ def _snap(origin, f, colliders, wants):
     return best
 
 
-def compute(view, colliders, hand=None):
-    """Where the reticle sits this frame, where a shot would go, and where the hook would catch."""
+def _hook_clear(origin, hook, colliders):
+    """Nothing stands between the camera and the hook point but the bone it sits on (the brow sits among
+    the skull, snout and antlers; the hump on the torso) and the boss's surface right around it."""
+    d, dist = _towards(origin, hook.centre())
+    hit = collide.ray_cast(origin, d, colliders, dist, lambda c: c.bone != hook.bone)
+    return hit is None or hit.t >= dist - HOOK_SURFACE
+
+
+def compute(view, colliders, hand=None, hooks=()):
+    """Where the reticle sits this frame, where a shot would go, and where the hook would catch.
+    `hooks` are the boss's hook points (Boss.hook_targets()); the hook catches nowhere else."""
     origin = (view.x, view.y, view.z)
     f, _, _ = basis(view)
     aim = Aim(origin, f)
@@ -83,15 +94,18 @@ def compute(view, colliders, hand=None):
         if hit is not None and hit.collider.kind == "part":
             aim.target, aim.flags = hit.collider, FLAG_PART
 
-    hook_target = None
-    if hand is not None:
-        hook_target = _snap(origin, f, colliders, lambda c: c.hookable)
-        d = _towards(origin, hook_target.centre())[0] if hook_target is not None else f
-        hit = collide.ray_cast(origin, d, colliders, 200.0)
-        if hit is not None and hit.collider.hookable and math.dist(hand, hit.point) <= HOOK_RANGE:
-            aim.hook, aim.flags = hit, aim.flags | FLAG_HOOK
+    best = math.radians(HOOK_ASSIST_DEG)
+    for hook in hooks if hand is not None else ():
+        d, dist = _towards(origin, hook.centre())
+        angle = math.acos(max(-1.0, min(1.0, sum(a * b for a, b in zip(d, f)))))
+        if hook.ray(origin, f) is not None:
+            angle = 0.0  # the reticle is on it
+        if angle <= best and math.dist(hand, hook.centre()) <= HOOK_RANGE and _hook_clear(origin, hook, colliders):
+            best, aim.hook = angle, collide.Hit(dist, hook.centre(), hook)
+    if aim.hook is not None:
+        aim.flags |= FLAG_HOOK
 
-    snapped = part if part is not None else (hook_target if aim.hook is not None else None)
+    snapped = part if part is not None else (aim.hook.collider if aim.hook is not None else None)
     if snapped is not None:
         offset = project(view, snapped.centre()) or (0.0, 0.0)
         aim.dx, aim.dy = (max(-MAX_OFFSET, min(MAX_OFFSET, round(p))) for p in offset)
