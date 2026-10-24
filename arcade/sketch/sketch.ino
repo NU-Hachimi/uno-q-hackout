@@ -4,6 +4,9 @@
 #include <DIYables_TFT_Touch_Shield.h>
 #include <math.h>
 #include "video_protocol.h"
+#include "render.h"
+#include "scene.h"
+#include "tft8080.h"
 
 #if !defined(ARDUINO_UNO_Q)
 #error "Select Arduino UNO Q for this starter."
@@ -13,6 +16,11 @@
 #ifndef ARCADE_TFT_HX8357D
 #define ARCADE_TFT_HX8357D 1
 #endif
+// G3D_DEMO renders the 3D meadow continuously on the MCU; Python is not needed.
+#ifndef G3D_DEMO
+#define G3D_DEMO 1
+#endif
+
 #if ARCADE_TFT_HX8357D
 DIYables_TFT_HX8357D_Shield display;
 #else
@@ -98,7 +106,7 @@ void showWaiting() {
 }
 
 bool drawFrame(int x, int y, int pressed, int ax, int ay, int az, int connected) {
-  if (videoSession) return false;  // RetroArch owns the display until release/timeout.
+  if (videoSession || G3D_DEMO) return false;  // RetroArch owns the display until release/timeout.
   // Bound every RPC input before using it for drawing or bit masks.
   x = constrain(x, 20, 460);
   y = constrain(y, 168, 300);
@@ -132,7 +140,7 @@ bool drawFrame(int x, int y, int pressed, int ax, int ay, int az, int connected)
 }
 
 int beginVideo() {
-  if (videoSession) return 0;  // Only one stream may own the display.
+  if (videoSession || G3D_DEMO) return 0;  // Only one stream may own the display.
   nextVideoSession = nextVideoSession == 2147483647 ? 1 : nextVideoSession + 1;
   videoSession = nextVideoSession;
   display.fillScreen(TFT_BLACK);
@@ -165,19 +173,75 @@ bool endVideo(int session) {
   return true;
 }
 
+uint32_t statFrames = 0, statRenderUs = 0, statPushUs = 0, statStartMs = 0;
+volatile int initStage = 0;  // last setup() step reached; reported by g3d_debug_stats
+String lastStats = "{}";
+
+// Each 240x16 tile becomes 480x32 on the panel; Bridge requests are served between tiles.
+void pushTile(int tile, const uint16_t* pixels) {
+  uint32_t start = micros();
+  tft::window(0, tile * render::TILE_H * 2, render::W * 2 - 1, (tile + 1) * render::TILE_H * 2 - 1);
+  for (int y = 0; y < render::TILE_H; ++y) {
+    tft::pushRow2x(pixels + y * render::W, render::W);
+    tft::pushRow2x(pixels + y * render::W, render::W);
+  }
+  statPushUs += micros() - start;
+  safeUpdate();
+}
+
+// Debug only (not part of the api.md contract): init stage and frame timing for desktop checks.
+// Registered with provide() so it answers from the Bridge thread even if setup() stalls.
+String debugStats() { return String("{\"stage\":") + initStage + ",\"frame\":" + lastStats + "}"; }
+
+void renderDemoFrame() {
+  if (initStage < 8) initStage = 8;
+  uint32_t start = micros();
+  uint32_t pushBefore = statPushUs;
+  render::frame(render::demoCamera(millis() / 1000.0f), pushTile);
+  statRenderUs += (micros() - start) - (statPushUs - pushBefore);
+  ++statFrames;
+  uint32_t now = millis();
+  if (now - statStartMs >= 2000) {
+    char json[160];
+    snprintf(json, sizeof(json),
+             "{\"fps\":%.1f,\"render_ms\":%.1f,\"push_ms\":%.1f,\"quads\":%d,\"frames\":%lu}",
+             statFrames * 1000.0f / (now - statStartMs), statRenderUs / 1000.0f / statFrames,
+             statPushUs / 1000.0f / statFrames, render::lastQuadDraws(), (unsigned long)statFrames);
+    lastStats = json;
+    statFrames = statRenderUs = statPushUs = 0;
+    statStartMs = now;
+  }
+}
+
 void setup() {
+  bool bridgeOk = Bridge.begin();
+  if (bridgeOk) Bridge.provide("g3d_debug_stats", debugStats);
+  initStage = 1;
   Modulino.begin(Wire1);
   buttons.begin();
   movementReady = movement.begin();
   display.begin();
   display.setRotation(1);  // Landscape: 480 x 320.
+  initStage = 2;
+#if G3D_DEMO
+  tft::begin(&display);
+  initStage = 3;
+  tft::window(0, 0, 479, 319);
+  tft::fill(TFT_BLACK, 480 * 320);
+  initStage = 4;
+  scene::buildDemo(1);
+  initStage = 5;
+  render::begin();
+  initStage = 6;
+#else
   display.fillScreen(TFT_BLACK);
   display.setTextSize(2);
   display.setTextWrap(false);
   textLine(10, "UNO Q arcade starter");
   display.drawRect(12, 160, 456, 148, TFT_WHITE);
   showWaiting();
-  if (Bridge.begin()) {
+#endif
+  if (bridgeOk) {
     Bridge.provide_safe("arcade_read_inputs", readInputs);
     Bridge.provide_safe("arcade_draw_frame", drawFrame);
     Bridge.provide_safe("arcade_video_begin", beginVideo);
@@ -187,9 +251,14 @@ void setup() {
   } else {
     textLine(36, "Bridge failed: restart app");
   }
+  initStage = 7;
 }
 
 void loop() {
+#if G3D_DEMO
+  renderDemoFrame();
+#else
   if (!waiting && millis() - lastFrameAt > 1500) showWaiting();
   delay(5);
+#endif
 }
