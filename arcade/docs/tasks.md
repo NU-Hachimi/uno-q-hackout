@@ -98,7 +98,7 @@ gantt
 | **A3** TGX 分块（60 min） | `sketch.yaml`、`sketch/render.*` | 加入 TGX 1.1.4；240×16 分块渲染旋转立方体，`pushRow2x` 推屏；实现 `G3D_DEMO=1` 演示模式的框架 | `make build` 通过；串口打印 `render_ms`、`push_ms` 和 fps（**G2**）；记录 LLEXT 堆用量 | 立方体正确、不撕裂 |
 | **A4** rpc + scene ✅ | `sketch/rpc.*`、`sketch/scene.*`、`sketch/inputs.*`、`sketch.ino` | 注册 api §2 全部方法（`Bridge.provide`，Bridge 线程只校验和拷贝，`k_mutex` 保护），保留 `arcade_read_inputs` / `arcade_video_*`；`scene_begin/chunk/commit` 包括 CRC 校验，kind 3 Look 按模式 1 调色；按键锁存（Input `buttons` bit4–7）；超过 1.5 s 没收到帧就回到演示画面 | `tests/cpp/render_preview.sh --snapshots` 用 Python 生成的场景和帧渲染出 PNG；板上 `g3d_debug_stats` 显示 `live: 1`、`seq` 递增、收包 20 包/秒 | 地形和物体位置正确 |
 | **B1** `g3d.py` ✅ | `python/g3d.py`、`tests/test_g3d.py` | 实现 `pack_scene`（hdr + chunks + CRC-16/CCITT-FALSE）、`pack_frame`、`unpack_input`（同时兼容 bytes 和 hex str，解析按键锁存位），以及 `G3D` 连接层（超时、重试、重新加载场景） | `pytest tests/` 通过 | — |
-| **B2** 生成工具（`mesh_build.py` ✅） | `tools/mesh_build.py`、`tools/rig_build.py`、`tools/snapshot.py` | `mesh_build.py`：OBJ + MTL → `sketch/gen/meshes.h`（按调色板索引分组）、`sketch/gen/palette.h`（调色板、默认 Look、场景默认值）、`python/gen/{mesh_ids,palette}.py`，`--check` 检查是否过期；`rig_build.py`：rig JSON → `sketch/gen/rig_*.h` + `python/gen/rig_*.py` + `tests/golden/rig_*.json`（未做）；`snapshot.py` 用真实游戏代码生成场景和帧，供桌面预览渲染 | 生成文件后再生成一次，内容不变；`make build` 能 include 生成的头文件 | B 审核骨骼数据 |
+| **B2** 生成工具（`mesh_build.py` ✅） | `tools/mesh_build.py`、`tools/rig_build.py`、`tools/snapshot.py` | `mesh_build.py`：OBJ + MTL → `sketch/gen/meshes.h`（按调色板索引分组）、`sketch/gen/palette.h`（调色板、默认 Look、场景默认值）、`python/gen/{mesh_ids,palette}.py`，`--check` 检查是否过期；`rig_build.py`：rig JSON → `sketch/gen/rigs.h` + `python/gen/rigs.py` + `tests/golden/rig_*.json` ✅；`mesh_build.py` 另生成 `python/gen/looks.py`（所有 Look 的 kind 3 块）✅；`snapshot.py` 用真实游戏代码生成场景和帧，供桌面预览渲染 | 生成文件后再生成一次，内容不变；`make build` 能 include 生成的头文件 | B 审核骨骼数据 |
 | **B3** `sim.py`（45 min） | `tools/sim.py` | 用 pygame 做线框渲染：读 `pack_frame` 输出的帧，按 api 约定还原相机、BOSS 骨骼和物体；键盘模拟摇杆和按键 | 无头模式（`SDL_VIDEODRIVER=dummy`）跑 300 帧不报错 | 能在电脑上走动并看到 BOSS 线框 |
 | **B4** 世界、姿态、碰撞（60 min） | `python/world.py`、`rig.py`、`collide.py`、`controls.py` | `make_scene(seed)` 生成高度图和岩石；`terrain_height` 用双线性插值；`rig.pose` 和 `colliders_world`；`ray_cast` 和 `sphere_vs`；`Controls` 做边沿检测 | `pytest` 通过，包括 rig golden 比对（误差 ≤ 1 cm）和射线命中的各种情况 | — |
 
@@ -108,7 +108,7 @@ gantt
 
 | 卡 | 文件 | 内容 | Claude 自检 | 人工确认 |
 | --- | --- | --- | --- | --- |
-| **A5** rig 绘制 | `sketch/rig.*` | 实现 `pose()`（api §5.1），绘制骨骼网格和槽位部件，处理 `part_alive` 和 `hit_slot` 闪烁 | 在 `tests/cpp/` 用 g++ 编译 `rig.cpp`，与 `tests/golden/rig_*.json` 比对，误差 ≤ 1 cm | idle 和 punch 动作正确 |
+| **A5** rig 绘制 ✅ | `sketch/rig.*`、`render.*` | 实现 `pose()`（api §5.1），每帧 3 个 Rig 块（BOSS、马、骑手），绘制骨骼网格和槽位部件，处理 `part_alive`、`hit_slot` 闪烁、`fade` 和角色灯；演示画面改为绕麋鹿转圈、循环播放动画，马和骑手绕圈奔跑 | `sh tests/cpp/rig_golden.sh`：772 个骨骼位置，最大误差 0.001 cm；板上 11–12 fps（object 11–19 ms） | idle 和 punch 动作正确 |
 | **A6** 雾、天空、草地 | `sketch/render.*` | z-buffer 深度雾配 16 级查找表；天空两色渐变；地形按两种草色交错着色 | `flags.bit1` 开关雾，分别打印两种情况的 `render_ms` | 雾的效果和远处的隐没 |
 | **A7** HUD（基础版 ✅） | `sketch/hud.*`、`hud_text.h`、`hud_font.h` | 血格、BOSS 血条、准星（十字 / 部件四角 / 可挂钩菱形）、`msg_id` 文案、暂停菜单（`msg_id` 9–11 高亮）、Ready 和结算提示；只画在当前分块内。字体暂用 Adafruit GFX 的 5×7，等 `assets/fonts/` 和 `font_build.py` | 桌面预览 `--snapshots` 的 5 张图 | 5 种布局清楚可读 |
 | **A8** 陀螺仪（可选） | `sketch/rpc.*` | 在 Input 中填入 `gx/gy`。视角改由加速度的倾斜速率控制，陀螺仪不再必需 | Python 日志中转动掌机时 `gx/gy` 有变化 | — |
@@ -124,7 +124,7 @@ gantt
 | 卡 | 文件 | 内容 | Claude 自检 | 人工确认 |
 | --- | --- | --- | --- | --- |
 | **A9** 绳索与钩爪 | `sketch/render.*` | 从 `hand` 挂点到 `anchor` 画 3D 线段，绘制 `hook_head` 物体 | replay 发送 hook 包，渲染不出错 | 绳索跟随钩爪 |
-| **A10** 岩石实例化 | `sketch/scene.*`、`render.*` | 处理 kind 2 chunk；岩石按 yaw 和 scale 实例化，y 坐标由 `terrainHeight` 求出 | 用 g++ 比对 `terrainHeight` 与 Python 版结果一致 | 岩石贴在地面上 |
+| **A10** 岩石实例化 ✅ | `sketch/scene.*`、`render.*`、`python/world.py` | 处理 kind 2 chunk（`variant` 即网格 ID）；岩石按 yaw 和 scale 实例化，y 坐标由 `terrainHeight` 求出，超出雾距离的不画；`world.scatter_rocks` 在场地外散布 40 块岩石和废墟 | 用 g++ 比对 `terrainHeight` 与 Python 版结果一致 | 岩石贴在地面上 |
 | **A11** 性能收尾 | `sketch/render.*` | 按物体包围球的 Y 范围做分块剔除，减少分块次数 | `render_ms` 比 I2 时更低（打印对比） | 帧率体感 |
 | **B9** 钩锁 | `python/player.py`、`collide.py` | 射线只命中 `hookable` 碰撞体；钩爪飞行 0.3 s，以 15 m/s 拉过去；挂点跟随骨骼；按 B 脱离；挂住时伤害 ×2 | 单元测试：BOSS 运动时挂点误差为 0 | 手感 |
 | **B10** 甩动、跪地、弱点、冲击波 | `python/boss.py` | 挂住后触发甩动窗口；腿甲全部击破后跪地；头部弱点只有挂住时才能打中；冲击波需要跳跃躲避 | 脚本模拟打完 P1 一局 | 节奏 |

@@ -24,10 +24,23 @@ ROCK_A = 29
 ROCK_B = 30
 PILLAR_BROKEN = 31
 ARCH_FRAGMENT = 32
+PC_HIPS = 33
+PC_CHEST = 34
+PC_HEAD = 35
+PC_ARM = 36
+PC_ARM_R = 37
+PC_THIGH = 38
+PC_SHIN = 39
+HORSE_BODY = 40
+HORSE_NECK = 41
+HORSE_HEAD = 42
+HORSE_TAIL = 43
+HORSE_LEG = 44
+HORSE_SHIN = 45
 
 # Bounding radius around each mesh origin, metres.
 RADIUS = {
-    0: 1.7084,
+    0: 1.6879,
     1: 0.4000,
     2: 0.7000,
     3: 0.3500,
@@ -50,7 +63,20 @@ RADIUS = {
     30: 1.4492,
     31: 4.4686,
     32: 5.6658,
+    33: 0.4701,
+    34: 0.5770,
+    35: 0.3025,
+    36: 0.5423,
+    37: 0.6640,
+    38: 0.4464,
+    39: 0.4554,
+    40: 0.9489,
+    41: 0.7295,
+    42: 0.5803,
+    43: 0.7209,
+    44: 0.5079,
+    45: 0.4858,
 }
 
 # Attachment points in mesh space, metres.
-PC_HAND = (0.2800, 1.1000, 0.1200)
+PC_HAND = (-0.3000, 1.0200, 0.4500)

@@ -6,9 +6,10 @@
 // g3d wire format (docs/api.md §3). Platform-independent: the desktop preview parses with it too.
 namespace g3d {
 
-constexpr uint8_t VERSION = 1;
-constexpr int MAX_OBJ = 12, MAX_PAYLOAD = 192, INPUT_SIZE = 16, CAPS_SIZE = 11;
-constexpr int HEADER_SIZE = 48, OBJ_SIZE = 12;
+constexpr uint8_t VERSION = 2;
+constexpr int MAX_OBJ = 9, MAX_PAYLOAD = 192, INPUT_SIZE = 16, CAPS_SIZE = 11;
+constexpr int FRAME_RIGS = 3, RIG_SIZE = 17;  // blocks: 0 boss, 1 horse, 2 rider
+constexpr int HEADER_SIZE = 24 + FRAME_RIGS * RIG_SIZE + 8, OBJ_SIZE = 12;  // 83
 
 enum State : uint8_t { READY = 0, FIGHT = 1, WIN = 2, LOSE = 3, PAUSED = 4 };
 
@@ -27,15 +28,21 @@ struct Object {
   float yaw, pitch, scale;  // rad, rad, factor
 };
 
+struct RigState {
+  uint8_t rigId, anim, phase, hitSlot;  // rigId 0: not drawn; hitSlot 0xFF: none
+  float x, y, z, yaw;                   // m, rad
+  uint32_t partAlive;
+  bool charLight;                       // rflags bit0
+  float fade;                           // rflags bits1-7 as 0..1 (1 = not drawn)
+};
+
 struct Frame {
   uint8_t seq, flags, nObj;
   float camX, camY, camZ, camYaw, camPitch, fovX;  // m and rad
   uint8_t state, hp, hpMax, bossHp, msg;
   int16_t reticleX, reticleY;  // px offset from the 240x160 centre
   uint8_t reticleFlags, timer;
-  uint8_t rigId, anim, phase, hitSlot;
-  float rigX, rigY, rigZ, rigYaw;
-  uint32_t partAlive;
+  RigState rig[FRAME_RIGS];
   uint8_t hookFlags;
   float anchorX, anchorY, anchorZ;
   Object obj[MAX_OBJ];

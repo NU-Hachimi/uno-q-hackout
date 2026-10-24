@@ -7,7 +7,7 @@ def test_scene_shape_and_defaults():
     assert all(-127 <= h <= 127 for h in scene.heights)
     lo, hi = world.extent(scene)
     assert (lo, hi) == (-128.0, 128.0)
-    assert scene.fog_far == 120 and scene.fog_near == 40
+    assert scene.fog_far == 120 and scene.fog_near == 16  # forbidden_plain starts the haze at 16 m
 
 
 def test_arena_is_flat():

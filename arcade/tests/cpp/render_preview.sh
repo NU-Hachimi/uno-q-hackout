@@ -7,7 +7,7 @@ set -eu
 cd "$(dirname "$0")/../.."
 mkdir -p build/preview
 g++ -std=gnu++17 -O2 -w ${CXXFLAGS:-} -I sketch \
-    tests/cpp/render_preview.cpp sketch/g3d_proto.cpp sketch/scene.cpp sketch/render.cpp sketch/hud.cpp \
+    tests/cpp/render_preview.cpp sketch/g3d_proto.cpp sketch/scene.cpp sketch/render.cpp sketch/rig.cpp sketch/hud.cpp \
     sketch/src/tgx/*.cpp -o build/preview/render_preview
 
 to_png() {
@@ -30,7 +30,11 @@ if [ "${1:-}" = "--snapshots" ]; then
     python3 tools/snapshot.py "$snap"
     for frame in "$snap"/*.frame; do
         name=$(basename "$frame" .frame)
-        build/preview/render_preview "build/preview/$name.ppm" --scene "$snap/scene.bin" --frame "$frame"
+        scene="$snap/scene.bin"
+        [ -f "$snap/$name.scene" ] && scene="$snap/$name.scene"
+        sky=""
+        [ -f "$snap/$name.sky" ] && sky="--sky $snap/$name.sky"
+        build/preview/render_preview "build/preview/$name.ppm" --scene "$scene" --frame "$frame" $sky
         to_png "build/preview/$name.ppm" "build/preview/$name.png"
     done
     exit 0

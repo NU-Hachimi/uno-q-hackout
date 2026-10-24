@@ -8,9 +8,10 @@ import math
 import struct
 from dataclasses import dataclass, field
 
-G3D_VERSION = 1
+G3D_VERSION = 2
 MAX_PAYLOAD = 192
-MAX_OBJ = 12
+MAX_OBJ = 9
+FRAME_RIGS = 3           # rig blocks per frame: 0 boss, 1 horse, 2 rider (api.md §3.3)
 CHUNK_SIZE = 192
 
 KIND_TERRAIN = 1
@@ -27,14 +28,16 @@ BTN_A, BTN_B, BTN_C, BTN_STICK = 1, 2, 4, 8
 FLAG_WIREFRAME, FLAG_NO_FOG, FLAG_NO_HUD, FLAG_HURT, FLAG_FREEZE, FLAG_NO_GRADE = (1 << i for i in range(6))
 
 _HEADER = struct.Struct("<BBBBhhhHhBBBBBBbbBB")   # 24 B, §3.3
-_RIG = struct.Struct("<BBBBhhhHI")                # 16 B
+_RIG = struct.Struct("<BBBBhhhHIB")               # 17 B, x3
 _HOOK = struct.Struct("<BBhhh")                   # 8 B
 _OBJ = struct.Struct("<BBhhhHbB")                 # 12 B
 _INPUT = struct.Struct("<BBBBbbhhhbbBB")          # 16 B, §3.5
 _SCENE = struct.Struct("<BBHHHBBBBhhBBHHBBB")     # 25 B before slot_variant[], §3.1
 _CAPS = struct.Struct("<BHHBBBBBB")               # §3.4
 _ROCK = struct.Struct("<hhBBBB")                  # 8 B
-assert (_HEADER.size, _RIG.size, _HOOK.size, _OBJ.size, _INPUT.size, _SCENE.size) == (24, 16, 8, 12, 16, 25)
+_SKY = struct.Struct("<HHHBBHHBB")                # 14 B before the 76 B Look block, §3.6
+assert (_HEADER.size, _RIG.size, _HOOK.size, _OBJ.size, _INPUT.size, _SCENE.size) == (24, 17, 8, 12, 16, 25)
+FRAME_HEADER = _HEADER.size + FRAME_RIGS * _RIG.size + _HOOK.size  # 83
 
 
 def _clamp(v, lo, hi):
@@ -111,7 +114,8 @@ class Hud:
 
 @dataclass
 class Rig:
-    rig_id: int = 0
+    """One rig block. (x, y, z, yaw) places the rig origin; the root bone's offset sits on top of it."""
+    rig_id: int = 0          # 0: not drawn
     anim: int = 0
     phase: int = 0
     hit_slot: int = 0xFF
@@ -120,6 +124,8 @@ class Rig:
     z: float = 0.0
     yaw: float = 0.0
     part_alive: int = 0
+    char_light: bool = False  # camera-relative key light instead of the sun
+    fade: float = 0.0         # 0..1: blend towards the fog colour; 1 is not drawn
 
 
 @dataclass
@@ -130,9 +136,10 @@ class Hook:
     z: float = 0.0
 
 
-def pack_frame(seq, cam, objs, hud, rig=None, hook=None, flags=0):
+def pack_frame(seq, cam, objs, hud, rigs=(), hook=None, flags=0):
+    """rigs: up to FRAME_RIGS Rig (or None) in block order: boss, horse, rider."""
     objs = list(objs)[:MAX_OBJ]
-    rig = rig or Rig()
+    rigs = (list(rigs) + [None] * FRAME_RIGS)[:FRAME_RIGS]
     hook = hook or Hook()
     out = bytearray(_HEADER.pack(
         G3D_VERSION, seq & 0xFF, flags & 0xFF, len(objs),
@@ -140,13 +147,17 @@ def pack_frame(seq, cam, objs, hud, rig=None, hook=None, flags=0):
         u8(hud.state), u8(hud.hp), u8(min(hud.hp_max, 10)), u8(hud.boss_hp), u8(hud.msg),
         _clamp(round(hud.reticle_dx / 2), -128, 127), _clamp(round(hud.reticle_dy / 2), -128, 127),
         u8(hud.reticle_flags), u8(hud.timer)))
-    out += _RIG.pack(u8(rig.rig_id), u8(rig.anim), u8(rig.phase), u8(rig.hit_slot),
-                     pos16(rig.x), pos16(rig.y), pos16(rig.z), bam16(rig.yaw), rig.part_alive & 0xFFFFFFFF)
+    for rig in rigs:
+        rig = rig or Rig()
+        rflags = (1 if rig.char_light else 0) | (_clamp(round(rig.fade * 127), 0, 127) << 1)
+        out += _RIG.pack(u8(rig.rig_id), u8(rig.anim), u8(rig.phase), u8(rig.hit_slot),
+                         pos16(rig.x), pos16(rig.y), pos16(rig.z), bam16(rig.yaw), rig.part_alive & 0xFFFFFFFF,
+                         rflags)
     out += _HOOK.pack(u8(hook.flags), 0, pos16(hook.x), pos16(hook.y), pos16(hook.z))
     for o in objs:
         out += _OBJ.pack(u8(o.mesh), u8(o.tint), pos16(o.x), pos16(o.y), pos16(o.z),
                          bam16(o.yaw), bam8s(o.pitch), _clamp(round(o.scale * 16), 1, 255))
-    assert len(out) == 48 + 12 * len(objs) <= MAX_PAYLOAD
+    assert len(out) == FRAME_HEADER + 12 * len(objs) <= MAX_PAYLOAD
     return bytes(out)
 
 
@@ -201,7 +212,7 @@ class SceneDef:
     light_pitch: int = 0     # BAM8
     rig_id: int = 0
     slot_variants: list = field(default_factory=list)
-    rocks: list = field(default_factory=list)  # (x, z, yaw_rad, scale, variant, tint)
+    rocks: list = field(default_factory=list)  # (x, z, yaw_rad, scale, mesh_id, tint)
     look: bytes = b""        # 76 B Look block, or empty for the MCU default
 
 
@@ -234,6 +245,16 @@ def pack_scene(scene):
     for _, _, data in chunks:  # already in kind, then index order
         crc = crc16(data, crc)
     return header, chunks, crc
+
+
+def pack_sky(fields, look):
+    """g3d_scene_sky payload (90 B): scene_defaults-style fields (RGB565 colours, fog in 2 m units,
+    BAM8 light) followed by a 76 B Look block."""
+    if len(look) != 76:
+        raise ValueError("Look block must be 76 bytes")
+    f = fields
+    return _SKY.pack(f["sky_top"], f["sky_horizon"], f["fog_color"], u8(f["fog_near"]), u8(f["fog_far"]),
+                     f["grass_a"], f["grass_b"], u8(f["light_yaw"]) & 0xFF, u8(f["light_pitch"])) + bytes(look)
 
 
 def unpack_caps(data):
@@ -270,6 +291,13 @@ class G3D:
                     self.call("g3d_scene_commit", crc, timeout=2):
                 return
         raise RuntimeError("scene upload failed %d times" % retries)
+
+    def set_sky(self, payload):
+        """Time-of-day update; failures are harmless (the next one replaces it)."""
+        try:
+            return bool(self.call("g3d_scene_sky", payload, timeout=self.timeout))
+        except Exception:
+            return False
 
     def frame(self, packet):
         """Send one frame; returns RawInput, or None when the call failed or was rejected."""

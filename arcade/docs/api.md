@@ -32,7 +32,7 @@ flowchart LR
 | 颜色 | 场景参数用 RGB565 `u16`；物体着色用 `u8` 调色板索引（0 = 网格自带颜色），调色板见 §5.4 |
 | 欧拉角顺序 | 先 yaw（Y），再 pitch（X），最后 roll（Z） |
 | 单次 RPC 负载 | 二进制参数 ≤ **192 B** |
-| 版本 | `G3D_VERSION = 1` |
+| 版本 | `G3D_VERSION = 2`（2026-10-24：帧包改为 3 个 Rig 块，见 §3.3） |
 
 ## 2. Bridge RPC（sketch 提供，Python 调用）
 
@@ -42,6 +42,7 @@ flowchart LR
 | `g3d_scene_begin` | `hdr: bin` | `bool` | 每局一次 | 清空场景，进入加载状态（画面显示 Loading） |
 | `g3d_scene_chunk` | `kind: int, index: int, data: bin` | `bool` | 每局若干次 | 上传地形或岩石数据 |
 | `g3d_scene_commit` | `crc16: int` | `bool` | 每局一次 | 校验 CRC 后构建地形网格；失败返回 false，Python 重新上传 |
+| `g3d_scene_sky` | `data: bin`（Sky，§3.6） | `bool` | 天色变化时，最多每 0.25 s 一次 | 只换天空、雾、草地颜色、太阳方向和 Look，不动地形和岩石；下一帧开始时生效。失败无妨，下一次会覆盖 |
 | `g3d_frame` | `pkt: bin` | `bin` Input（§3.3） | **每帧一次** | 包无效或场景未提交时返回空 bin |
 | `g3d_release` | — | `bool` | 退出时 | 交还显示权，回到 starter 等待画面 |
 
@@ -82,7 +83,7 @@ flowchart LR
 | `kind` | 内容 | 每块格式 |
 | --- | --- | --- |
 | 1 地形 | 高度图，按行主序，`i8` × `terrain_n²` | 第 `index` 块从第 `index × 192` 个字节开始，每块 ≤192 B |
-| 2 岩石 | 每块岩石 8 B：`x i16, z i16, yaw u8, scale u8 (1/16), variant u8, tint u8` | 每块 ≤24 个岩石，`index` 为块号 |
+| 2 岩石 | 每块岩石 8 B：`x i16, z i16, yaw u8, scale u8 (1/16), variant u8, tint u8`。`variant` 直接是网格 ID（§5.3，例如 `rock_a`、`pillar_broken`），`tint` 同物体 | 每块 ≤24 个岩石，`index` 为块号 |
 | 3 Look | 调色板 + 调色参数，格式见下表 | 只有 1 块，`index = 0`，76 B。**可省略**，省略时用 MCU 内置的默认 Look |
 
 岩石的 y 坐标由地形高度求出，两端用同一个函数 `terrain_height(x, z)`（§6.3 / §7）计算，结果是双线性插值。
@@ -103,7 +104,7 @@ flowchart LR
 | 71 | u16 | `gain` | RGB565，亮部乘色；0xFFFF = 不变 |
 | 73 | u8 | `posterize` | 每通道保留的位数，0 = 不处理。仅模式 2 |
 | 74 | u8 | `dither` | 0 关，1 Bayer 4×4。仅模式 2 |
-| 75 | u8 | 保留 | 0 |
+| 75 | u8 | `ground_fog` | 0–255：贴地雾强度。地面处最浓，9 m 高处消失，并随深度在 30 m 内逐渐加满，所以近处的 PC 不受影响，BOSS 的腿和远处地面沉进雾里。昼夜循环里随其他参数一起插值 |
 
 模式 1 下，调色同时作用于调色板和场景头里的 `sky_*`、`fog_color`、`grass_*`；模式 2 下这些颜色保持原样，统一在逐像素阶段处理，避免调两次。
 
@@ -113,10 +114,10 @@ flowchart LR
 
 | 偏移 | 类型 | 字段 | 说明 |
 | --- | --- | --- | --- |
-| 0 | u8 | `ver` | 1 |
+| 0 | u8 | `ver` | 2 |
 | 1 | u8 | `seq` | 帧序号，回显在 Input 中 |
 | 2 | u8 | `flags` | bit0 线框调试，bit1 关闭雾，bit2 隐藏 HUD，bit3 受击红闪，bit4 冻结画面（只重画 HUD），bit5 临时关闭调色（调试对比用） |
-| 3 | u8 | `n_obj` | 0–12 |
+| 3 | u8 | `n_obj` | 0–9 |
 | 4 | i16×3 | `cam_x, cam_y, cam_z` | |
 | 10 | u16 | `cam_yaw` | |
 | 12 | i16 | `cam_pitch` | |
@@ -131,27 +132,36 @@ flowchart LR
 | 22 | u8 | `reticle_flags` | bit0 指向部件，bit1 可挂钩 |
 | 23 | u8 | `timer` | 秒 |
 
-**Rig 块（偏移 24，16 B）**
+**Rig 块（偏移 24，3 个，每个 17 B）**
+
+约定：块 0 是 BOSS，块 1 是马，块 2 是骑手；`rig_id = 0` 的块不画。下表偏移相对于块的开头，块 k 从 `24 + 17k` 开始。
 
 | 偏移 | 类型 | 字段 |
 | --- | --- | --- |
-| 24 | u8 | `rig_id`（0 = 不画） |
-| 25 | u8 | `anim_id` |
-| 26 | u8 | `anim_phase`（0–255，表示一个动画周期内的位置） |
-| 27 | u8 | `hit_slot`（被击中而闪烁的槽位，0xFF = 无） |
-| 28 | i16×3 | `x, y, z`（骨骼根节点） |
-| 34 | u16 | `yaw` |
-| 36 | u32 | `part_alive`（bit i 表示槽位 i 未被击破） |
+| 0 | u8 | `rig_id`（0 = 不画；1 麋鹿、2 猩猩、3 马、4 骑手） |
+| 1 | u8 | `anim_id` |
+| 2 | u8 | `anim_phase`（0–255，表示一个动画周期内的位置） |
+| 3 | u8 | `hit_slot`（被击中而闪烁的槽位，0xFF = 无） |
+| 4 | i16×3 | `x, y, z`（骨骼根节点所在的原点；根骨骼的 `offset` 再叠加在上面） |
+| 10 | u16 | `yaw` |
+| 12 | u32 | `part_alive`（bit i 表示槽位 i 未被击破；没有槽位的 rig 发 0） |
+| 16 | u8 | `rflags`：bit0 使用角色灯（[art.md §4](art.md#4-调色与滤镜look)）；bit1–7 为 `fade`（0–127，颜色混向雾色的程度，127 = 不画） |
 
-**Hook 块（偏移 40，8 B）**
+**骑乘**：骑手块的原点由 Python 放在马的 `saddle` 挂点上（减去骑手根骨骼的 `offset`），只跟随马的 yaw，不跟随马身的俯仰。
+
+**角色灯**：渲染该 rig 时改用一盏只取决于相机的方向光，`L = normalize(−forward + 0.7·up + 0.45·right)`，环境光 0.55、漫反射 0.6，画完换回太阳光。
+
+**淡入淡出**：`fade` 不做半透明，而是把光照后的颜色按 `fade/127` 混向 `fog_color`。马在骑手离鞍后 0.45 s 内淡出，落地前 0.4 s 在骑手正下方淡入（[art.md §2](art.md#2-角色与场景)）。
+
+**Hook 块（偏移 75，8 B）**
 
 | 偏移 | 类型 | 字段 |
 | --- | --- | --- |
-| 40 | u8 | `flags`：bit0 显示绳索，bit1 已挂住 |
-| 41 | u8 | 保留 |
-| 42 | i16×3 | `anchor_x, _y, _z`：绳索一端在 PC 的 `hand` 挂点，另一端在这里 |
+| 75 | u8 | `flags`：bit0 显示绳索，bit1 已挂住 |
+| 76 | u8 | 保留 |
+| 77 | i16×3 | `anchor_x, _y, _z`：绳索一端在骑手 rig 的 `hand` 挂点（§5.1 `attach`），另一端在这里 |
 
-**物体（偏移 48，每个 12 B，最多 12 个）**
+**物体（偏移 83，每个 12 B，最多 9 个）**
 
 | 偏移 | 类型 | 字段 |
 | --- | --- | --- |
@@ -162,7 +172,7 @@ flowchart LR
 | 10 | i8 | `pitch` |
 | 11 | u8 | `scale`（1/16） |
 
-包长必须严格等于 `48 + 12 × n_obj`。
+包长必须严格等于 `83 + 12 × n_obj`（最大 191 B）。
 
 ### 3.4 Caps（`g3d_hello` 返回）
 
@@ -172,7 +182,7 @@ flowchart LR
 
 | 偏移 | 类型 | 字段 |
 | --- | --- | --- |
-| 0 | u8 | `ver` = 1 |
+| 0 | u8 | `ver` = `G3D_VERSION`（2） |
 | 1 | u8 | `seq_ack`：最近开始渲染的帧序号 |
 | 2 | u8 | `connected`：bit0 Buttons，bit1 Joystick，bit2 Movement |
 | 3 | u8 | `buttons`：bit0–3 是当前按住的 A、B、C、摇杆按下；**bit4–7 是“上一次回复以来新按下过”**（同样顺序），由 MCU 在两帧之间锁存，回复后清零，快速点按不会丢 *（待 A 确认）* |
@@ -185,6 +195,25 @@ flowchart LR
 | 15 | u8 | `push_ms` |
 
 **`msg_id` 表**（文字存在 MCU 端，`sketch/hud_text.h`）：0 无，1 “Press A to start”，2 “Break the armor”，3 “Hook on! (C)”，4 “Strike the head”，5 “Hold on!”，6 “Victory - C to restart”（被 13 取代），7 “Defeated - C to restart”（被 14 取代），8 “Controller missing”，9 菜单选中 Continue，10 菜单选中 Restart，11 菜单选中 Recalibrate（`game_state = 4` 时 HUD 画三项菜单并高亮该项），12 “Hold the console naturally, press A”，13 “Victory - A to restart”，14 “Defeated - A to restart”，15 “Stick move  Tilt look  B shoot  A menu”，16 “Waiting for Python”（仅 MCU 演示画面使用）。新增文案时追加编号，不要改已有编号。*（9–16 和 3 的按键文字为 2026-10-24 改动，跟随新的操作表，待 A 确认）*文案**只允许 ASCII 0x20–0x7E**，用像素字体绘制（[art.md §5](art.md#5-hud-与字体)），构建时检查。
+
+### 3.6 Sky（`g3d_scene_sky` 的 `data`，90 B）
+
+昼夜循环用（`world.sky_at`）：Python 在两套 Look 之间插值，把结果发给 MCU。MCU 用它替换场景头里的对应字段和 Look，重新调色、重新烘焙地形颜色和雾表（约 1–2 ms）。
+
+| 偏移 | 类型 | 字段 | 说明 |
+| --- | --- | --- | --- |
+| 0 | u16 | `sky_top` | RGB565，调色前 |
+| 2 | u16 | `sky_horizon` | |
+| 4 | u16 | `fog_color` | |
+| 6 | u8 | `fog_near` | 单位 2 m |
+| 7 | u8 | `fog_far` | 单位 2 m，同时是远裁剪面 |
+| 8 | u16 | `grass_a` | |
+| 10 | u16 | `grass_b` | |
+| 12 | u8 | `light_yaw` | BAM8 |
+| 13 | u8 | `light_pitch` | BAM8 |
+| 14 | 76 B | Look | 与 §3.2 kind 3 相同 |
+
+重新上传整个场景（`g3d_scene_begin`…`commit`）会把天色恢复成场景自带的 Look，Python 之后要再发一次 Sky。
 
 ## 4. 错误处理约定
 
@@ -234,6 +263,7 @@ flowchart LR
 | 字段 | 规则 |
 | --- | --- |
 | `bones` | ≤ 16 个，父骨骼必须排在子骨骼之前；`offset` 为在父骨骼坐标系中的位置（m） |
+| `attach` | 命名挂点 `{名称: {bone, offset}}`：麋鹿的 `head_weak`、马的 `saddle`（骑手根骨骼放在这里）、骑手的 `hand`（钩锁发射器口，绳索和子弹从这里出发） |
 | `colliders` | 只允许 `sphere` 和 `capsule`，坐标在骨骼局部坐标系中。`hookable` 表示钩锁能否挂上 |
 | `slots` | ≤ 32 个；`variants[0]` 固定为 `null`（空）；`tags` 供玩法端判断阶段。部件网格朝 +Z（向外）、底面在 z = 0，`rot`（欧拉角，规则同 track）把它转到附着面上。同一位置可以放两个槽位（例如石盖 `cover` 和弱点 `weak`） |
 | `anims` | ≤ 16 个。**线性插值**，欧拉角单位为度。没有 track 的骨骼保持静止姿态。关键帧在 phase 上的分布见下文 |
@@ -252,8 +282,8 @@ flowchart LR
 
 | 输出 | 使用方 |
 | --- | --- |
-| `sketch/gen/rig_<name>.h` | 渲染端：骨骼、槽位、动画关键帧（`const` 数组） |
-| `python/gen/rig_<name>.py` | 玩法端：同样的数据加上碰撞体和事件 |
+| `sketch/gen/rigs.h` | 渲染端：所有 rig 的骨骼、槽位、挂点、动画关键帧（`const` 数组，按 `rig_id` 索引） |
+| `python/gen/rigs.py` | 玩法端：同样的数据加上碰撞体和事件（`python/rig.py` 用它求姿态） |
 | `tests/golden/rig_<name>.json` | 双方：每个动画在 phase 0/64/128/192 时各骨骼的世界坐标原点。**两端实现的误差必须 ≤ 1 cm** |
 
 ### 5.2 网格：`assets/meshes/*.obj`
@@ -274,7 +304,7 @@ flowchart LR
 | 2 | `boss_shot` | | 6–15 | 保留 |
 | 3 | `hook_head` | | 16+ | 骨骼段、部件、岩石（自动分配） |
 
-PC 网格必须定义 `hand` 挂点（绳索起点），坐标写在 `assets/meshes.json` 中。文件格式：`{"meshes": [{"id": 0, "name": "pc", "tris": 60, "attach": {"hand": [x, y, z]}}, ...]}`，`tris` 仅供参考。
+0 号 `pc` 网格只在没有骑手 rig 时备用；绳索起点改为骑手 rig 的 `hand` 挂点（`assets/rigs/pc.json` 的 `attach`）。`pc` 网格的 `hand` 仍写在 `assets/meshes.json` 中。文件格式：`{"meshes": [{"id": 0, "name": "pc", "tris": 60, "attach": {"hand": [x, y, z]}}, ...]}`，`tris` 仅供参考。
 
 ### 5.4 调色板与 Look：`assets/palette.json`、`assets/looks/<name>.json`
 
@@ -379,7 +409,8 @@ class Game:    def step(self, inp: Input, dt: float) -> FrameArgs: ...  # Ready 
 
 | 项目 | 上限 | 依据 |
 | --- | --- | --- |
-| 每帧物体数 | 12 | 192 B 包长 |
+| 每帧物体数 | 9 | 192 B 包长（3 个 Rig 块之后） |
+| 每帧 rig 数 | 3 | BOSS、马、骑手 |
 | 骨骼段数 | 16 | rig 姿态计算开销 |
 | 槽位数 | 32 | `part_alive` 为 u32 |
 | 动画数 | 16 | |

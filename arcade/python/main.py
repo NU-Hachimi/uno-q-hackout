@@ -13,14 +13,14 @@ MAX_DT = 0.1            # s; clamp long stalls so the game does not jump
 RECONNECT_FAILURES = 10  # api.md §4: re-run hello and the scene upload
 
 link = g3d.G3D(Bridge.call)
-scene = world.make_scene(seed=1)
-game = Game(scene)
+game = Game(world.make_scene(seed=1, look=world.TIME_OF_DAY[0]), seed=1)
 state = {"connected": False, "raw": None, "seq": 0, "last": time.monotonic()}
 
 
 def connect():
     caps = link.hello()
-    link.load_scene(scene)
+    link.load_scene(game.scene)
+    game.sky_sent = None  # the upload reset the sky to the scene's Look; resend the current time of day
     link.failures = 0
     state["connected"] = True
     print(f"g3d connected: {caps}")
@@ -39,7 +39,10 @@ def loop():
     dt = min(start - state["last"], MAX_DT)
     state["last"] = start
     cam, objs, hud, flags = game.step(state["raw"], dt)
-    state["raw"] = link.frame(g3d.pack_frame(state["seq"], cam, objs, hud, flags=flags))
+    sky = game.sky_update(dt)
+    if sky:
+        link.set_sky(sky)
+    state["raw"] = link.frame(g3d.pack_frame(state["seq"], cam, objs, hud, rigs=game.rigs(), flags=flags))
     state["seq"] = (state["seq"] + 1) & 0xFF
     if link.failures >= RECONNECT_FAILURES:
         print("g3d: no replies, reconnecting")

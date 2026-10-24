@@ -18,5 +18,6 @@
   "fog_far": 55,
   "light_yaw": 200,
   "light_pitch": 12
- }
+ },
+ "ground_fog": 150
 }

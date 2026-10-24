@@ -36,20 +36,27 @@ bool parseFrame(const uint8_t* p, size_t n, Frame& f) {
   f.reticleFlags = p[22];
   f.timer = p[23];
 
-  f.rigId = p[24];
-  f.anim = p[25];
-  f.phase = p[26];
-  f.hitSlot = p[27];
-  f.rigX = pos(p + 28);
-  f.rigY = pos(p + 30);
-  f.rigZ = pos(p + 32);
-  f.rigYaw = bam16(rd16(p + 34));
-  f.partAlive = rd32(p + 36);
+  for (int k = 0; k < FRAME_RIGS; ++k) {
+    const uint8_t* r = p + 24 + RIG_SIZE * k;
+    RigState& s = f.rig[k];
+    s.rigId = r[0];
+    s.anim = r[1];
+    s.phase = r[2];
+    s.hitSlot = r[3];
+    s.x = pos(r + 4);
+    s.y = pos(r + 6);
+    s.z = pos(r + 8);
+    s.yaw = bam16(rd16(r + 10));
+    s.partAlive = rd32(r + 12);
+    s.charLight = r[16] & 1;
+    s.fade = (r[16] >> 1) / 127.0f;
+  }
 
-  f.hookFlags = p[40];
-  f.anchorX = pos(p + 42);
-  f.anchorY = pos(p + 44);
-  f.anchorZ = pos(p + 46);
+  const uint8_t* hook = p + 24 + RIG_SIZE * FRAME_RIGS;
+  f.hookFlags = hook[0];
+  f.anchorX = pos(hook + 2);
+  f.anchorY = pos(hook + 4);
+  f.anchorZ = pos(hook + 6);
 
   for (int i = 0; i < f.nObj; ++i) {
     const uint8_t* o = p + HEADER_SIZE + OBJ_SIZE * i;

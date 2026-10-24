@@ -31,9 +31,9 @@ Desktop Python is the repo-root `.venv`. It was created from miniforge's Python 
 
 `arduino-cli` is in `~/.local/bin`, so `make build` works locally. The first build downloads the core and libraries from the `sketch.yaml` profile.
 
-Parts of the layout in `api.md` and `workflow.md` are still planned: `tools/rig_build.py`, `tools/sim.py`, `rig.*`, `collide.py`, `boss.py` and the golden rig data don't exist yet. Check what actually exists before assuming it.
+Parts of the layout in `api.md` and `workflow.md` are still planned: `tools/sim.py`, `collide.py` and a real `boss.py` (B7) don't exist yet. `python/boss.py` is only a placeholder that cycles the moose animations. Check what actually exists before assuming it.
 
-**Controls follow the 操作表 in `docs/plan.md`** (settled 2026-10-24): stick moves, tilt turns the view (rate control), A opens the menu (Continue / Restart / Recalibrate) and confirms, B shoots, C is the hook. There is no dodge or jump. Don't bring back stick-press dodge, hold-C lock-on or tilt-only aiming.
+**Controls follow the 操作表 in `docs/plan.md`** (settled 2026-10-24): stick x steers the horse and the camera turns with it, stick y is throttle, tilt adds look on top (rate control; riding without tilt eases the camera back behind the horse), A opens the menu (Continue / Restart / Recalibrate) and confirms, B shoots, C is the hook. There is no dodge or jump. Don't bring back stick-press dodge, hold-C lock-on or tilt-only aiming.
 
 The root README holds the scoring rubrics; the arcade rubric is the target. The track READMEs and PREWORK.md are participant-facing docs. Keep them in sync when you change commands or defaults they quote.
 
@@ -59,8 +59,9 @@ Add `SERIAL=<adb serial>` when more than one device is connected. `make flash` d
 
 Other tools:
 
-- **Tests:** `.venv/bin/python -m pytest arcade/tests` (protocol, terrain, game state machine). `tests/conftest.py` puts `python/` on `sys.path`, as on the board.
-- **Generated code:** `python3 tools/mesh_build.py` turns `assets/` into `sketch/gen/{meshes,palette}.h` and `python/gen/{mesh_ids,palette}.py`; `--check` exits 1 if they are stale. Rerun it after any asset change.
+- **Tests:** `.venv/bin/python -m pytest arcade/tests` (protocol, terrain, rigs, scenery, game state machine). `tests/conftest.py` puts `python/` on `sys.path`, as on the board. If `.venv` is missing, create it with `~/miniforge3/bin/python3 -m venv .venv && .venv/bin/pip install pytest`.
+- **Rig golden check:** `sh arcade/tests/cpp/rig_golden.sh` compiles `sketch/rig.cpp` with g++ and compares every bone with `tests/golden/rig_*.json` (≤ 1 cm).
+- **Generated code:** `python3 tools/mesh_build.py` turns `assets/` into `sketch/gen/{meshes,palette}.h` and `python/gen/{mesh_ids,palette,looks}.py`. Then `python3 tools/rig_build.py` turns `assets/rigs/` into `sketch/gen/rigs.h`, `python/gen/rigs.py` and `tests/golden/rig_*.json`. Both take `--check`, which exits 1 if their output is stale. Rerun them, in that order, after any asset change.
 - **Wi-Fi:** `tools/board-wifi.sh` joins the board to NUwave or eduroam over adb. `--forget` removes the saved login.
 
 **Core version:** the boards run `arduino:zephyr 1.0.0`, but the starter README pins 0.55.2. `arcade/sketch/sketch.yaml` decides which version gets used. All library versions there are pinned.
@@ -80,7 +81,7 @@ The link runs at **115200 baud**, roughly 11.5 KB/s, and the sketch accepts at m
 ### Game path
 
 1. `python/main.py` connects (`g3d_hello`, scene upload), then loops at ~20 Hz: `game.step(raw_input, dt)` → `g3d.pack_frame` → `g3d_frame`, whose reply is the next 16 B Input.
-2. Python modules: `g3d.py` (wire format, client), `world.py` (scene, `terrain_height`), `controls.py` (stick, button edges, tilt rates), `camera.py`, `player.py`, `game.py` (Ready → Fight ⇄ Menu).
+2. Python modules: `g3d.py` (wire format v2, client), `world.py` (scene, rocks, time-of-day Looks, `terrain_height`), `rig.py` (pose reference), `controls.py` (stick, button edges, tilt rates), `camera.py`, `player.py` (PC = horse + rider rigs), `boss.py` (placeholder), `game.py` (Ready → Fight ⇄ Menu; a day-cycle clock whose sky `main.py` sends with `g3d_scene_sky`).
 3. The MCU latches button presses between frames (Input `buttons` bit4–7), so short taps are not lost.
 4. If no frame arrives for 1.5 s, the sketch renders its own demo orbit with "WAITING FOR PYTHON".
 
@@ -105,7 +106,8 @@ The link runs at **115200 baud**, roughly 11.5 KB/s, and the sketch accepts at m
 
 - **Files:**
   - `tft8080.*` does BSRR pixel writes.
-  - `g3d_proto.*` parses frames (platform-independent).
+  - `g3d_proto.*` parses frames (platform-independent). Frame v2 has 3 rig blocks: boss, horse, rider.
+  - `rig.*` evaluates rig poses (a port of `python/rig.py`); `render.cpp` draws bones and slot parts, with `fade` (blend to fog colour) and the camera-relative character light.
   - `scene.*` holds terrain, the upload staging copy and Look grading.
   - `render.*` is platform-independent TGX code: sky, grass, objects, fog, 240×32 tiles, built at `-O2` via a pragma; the core defaults to `-Os`.
   - `hud.*` draws text, reticle and menu into each tile.
@@ -137,7 +139,7 @@ The link runs at **115200 baud**, roughly 11.5 KB/s, and the sketch accepts at m
 ### Game loop
 
 1. Python runs all game logic: state machine, player, boss AI, collision, and camera.
-2. Each frame, Python sends one binary `g3d_frame` packet (≤192 B).
+2. Each frame, Python sends one binary `g3d_frame` packet (≤192 B): an 83 B header with 3 rig blocks, then ≤9 objects.
 3. The sketch replies with a 16 B Input.
 4. The scene (terrain, rocks, part variants) is uploaded once per round with `g3d_scene_begin/chunk/commit`, which is CRC-checked.
 

@@ -4,18 +4,26 @@
 #include <string.h>
 
 #include "g3d_proto.h"
+#include "gen/meshes.h"
+#include "gen/rigs.h"
 
 namespace scene {
 
 Params params;
 int8_t heights[MAX_N * MAX_N];
 uint16_t palette[32];
+Rock rocks[MAX_ROCKS];
+int nRocks = 0;
+uint8_t bossRig = 0;
+uint8_t slotVariant[32];
+int nSlots = 0;
 
 namespace {
 
 constexpr float TAU = 6.28318530718f;
 constexpr int CHUNK = 192;
 constexpr int LOOK_SIZE = 76;
+constexpr int SKY_SIZE = 14 + LOOK_SIZE;
 
 // Header colours before grading, so a new Look can be applied to them.
 struct RawColors {
@@ -28,12 +36,37 @@ struct Staging {
   int8_t heights[MAX_N * MAX_N];
   uint8_t rocks[MAX_ROCKS * 8];
   int nRocks;
+  uint8_t rigId, slotVariant[32];
+  int nSlots;
   uint32_t terrainChunks, rockChunks;  // bit per received chunk index
   uint8_t lookRaw[LOOK_SIZE];  // kept as sent, for the CRC
   gen::Look look;
   bool hasLook, begun, committed;
 };
 Staging staging;
+
+struct Sky {
+  RawColors colors;
+  float fogNear, fogFar, lightYaw, lightPitch;
+  gen::Look look;
+  bool pending;
+};
+Sky sky;
+
+// Kind 3 Look block (api.md §3.2).
+void parseLook(const uint8_t* data, gen::Look& look) {
+  for (int i = 0; i < 32; ++i) look.palette[i] = g3d::rd16(data + 2 * i);
+  look.gradeMode = data[64] > 2 ? 0 : (data[64] == 2 ? 1 : data[64]);  // no per-pixel grading yet
+  look.saturation = data[65];
+  look.contrast = data[66];
+  look.brightness = int8_t(data[67]);
+  look.gamma = data[68];
+  look.lift = g3d::rd16(data + 69);
+  look.gain = g3d::rd16(data + 71);
+  look.posterize = data[73];
+  look.dither = data[74];
+  look.groundFog = data[75];
+}
 
 // Smooth value noise on a coarse lattice; deterministic for a given seed (same as world.py).
 float lattice(uint32_t seed, int x, int z) {
@@ -78,6 +111,7 @@ void applyLook(const gen::Look& look, const RawColors& raw, Params& p) {
   p.fogColor = grade(raw.fogColor, look);
   p.grassA = grade(raw.grassA, look);
   p.grassB = grade(raw.grassB, look);
+  p.groundFog = look.groundFog / 255.0f;
 }
 
 }  // namespace
@@ -109,6 +143,26 @@ void buildDemo(uint32_t seed) {
       heights[j * n + i] = (int8_t)(v < -127 ? -127 : (v > 127 ? 127 : v));
     }
   }
+
+  // Demo scenery: a ring of rocks and ruins outside the arena; the boss wears variant 1 everywhere.
+  static const uint8_t KINDS[] = {gen::MESH_ROCK_A, gen::MESH_ROCK_B, gen::MESH_ROCK_A, gen::MESH_PILLAR_BROKEN,
+                                  gen::MESH_ROCK_B, gen::MESH_ARCH_FRAGMENT};
+  nRocks = 36;
+  for (int i = 0; i < nRocks; ++i) {
+    const float u = 0.5f + 0.5f * lattice(seed + 7, i, 0), v = 0.5f + 0.5f * lattice(seed + 7, i, 1);
+    const float angle = (i + u) * (TAU / nRocks), dist = 36 + 70 * v;
+    Rock& k = rocks[i];
+    k.mesh = KINDS[i % 6];
+    k.x = dist * sinf(angle);
+    k.z = dist * cosf(angle);
+    k.y = terrainHeight(k.x, k.z);
+    k.yaw = TAU * (0.5f + 0.5f * lattice(seed + 7, i, 2));
+    k.scale = (k.mesh == gen::MESH_ROCK_A || k.mesh == gen::MESH_ROCK_B) ? 1.0f + 1.6f * u : 1.0f + 0.4f * v;
+    k.tint = 0;
+  }
+  bossRig = 1;
+  nSlots = 32;
+  for (int i = 0; i < nSlots; ++i) slotVariant[i] = 1;
 }
 
 float terrainHeight(float x, float z) {
@@ -149,7 +203,9 @@ bool uploadBegin(const uint8_t* h, size_t n) {
   if (p.terrainN < 2 || p.terrainN > MAX_N || p.cell <= 0 || p.fogFar <= p.fogNear || p.fogFar < 4 ||
       staging.nRocks > MAX_ROCKS)
     return false;
-  // Slot variants (h[25..]) belong to the boss rig, which is not drawn yet.
+  staging.rigId = h[1];
+  staging.nSlots = h[24] > 32 ? 32 : h[24];
+  memcpy(staging.slotVariant, h + 25, staging.nSlots);
   staging.terrainChunks = staging.rockChunks = 0;
   staging.hasLook = false;
   staging.begun = true;
@@ -176,17 +232,7 @@ bool uploadChunk(uint8_t kind, uint8_t index, const uint8_t* data, size_t n) {
   if (kind == 3) {
     if (index != 0 || n != size_t(LOOK_SIZE)) return false;
     memcpy(staging.lookRaw, data, LOOK_SIZE);
-    gen::Look& look = staging.look;
-    for (int i = 0; i < 32; ++i) look.palette[i] = g3d::rd16(data + 2 * i);
-    look.gradeMode = data[64] > 2 ? 0 : (data[64] == 2 ? 1 : data[64]);  // no per-pixel grading yet
-    look.saturation = data[65];
-    look.contrast = data[66];
-    look.brightness = int8_t(data[67]);
-    look.gamma = data[68];
-    look.lift = g3d::rd16(data + 69);
-    look.gain = g3d::rd16(data + 71);
-    look.posterize = data[73];
-    look.dither = data[74];
+    parseLook(data, staging.look);
     staging.hasLook = true;
     return true;
   }
@@ -208,12 +254,59 @@ bool uploadCommit(uint16_t crc) {
   return true;
 }
 
+static bool applySceneUpload();
+
+bool uploadSky(const uint8_t* d, size_t n) {
+  if (n != size_t(SKY_SIZE)) return false;
+  Sky next;
+  next.colors = {g3d::rd16(d), g3d::rd16(d + 2), g3d::rd16(d + 4), g3d::rd16(d + 8), g3d::rd16(d + 10)};
+  next.fogNear = d[6] * 2.0f;
+  next.fogFar = d[7] * 2.0f;
+  next.lightYaw = d[12] * (TAU / 256);
+  next.lightPitch = d[13] * (TAU / 256);
+  if (next.fogFar <= next.fogNear || next.fogFar < 4) return false;
+  parseLook(d + 14, next.look);
+  next.pending = true;
+  sky = next;
+  return true;
+}
+
 bool applyUpload() {
+  bool changed = applySceneUpload();
+  if (sky.pending) {
+    sky.pending = false;
+    params.fogNear = sky.fogNear;
+    params.fogFar = sky.fogFar;
+    params.lightYaw = sky.lightYaw;
+    params.lightPitch = sky.lightPitch;
+    applyLook(sky.look, sky.colors, params);
+    changed = true;
+  }
+  return changed;
+}
+
+// Copies a committed scene upload into the live scene.
+static bool applySceneUpload() {
   if (!staging.committed) return false;
   staging.committed = staging.begun = false;
   params = staging.params;
   memcpy(heights, staging.heights, sizeof(int8_t) * params.terrainN * params.terrainN);
   applyLook(staging.hasLook ? staging.look : gen::DEFAULT_LOOK, staging.colors, params);
+  nRocks = staging.nRocks;
+  for (int i = 0; i < nRocks; ++i) {
+    const uint8_t* r = staging.rocks + 8 * i;  // x i16, z i16, yaw u8, scale u8, variant u8, tint u8
+    Rock& k = rocks[i];
+    k.x = g3d::rd16s(r) / 64.0f;
+    k.z = g3d::rd16s(r + 2) / 64.0f;
+    k.y = terrainHeight(k.x, k.z);
+    k.yaw = r[4] * (TAU / 256);
+    k.scale = r[5] / 16.0f;
+    k.mesh = r[6];
+    k.tint = r[7] < 32 ? r[7] : 0;
+  }
+  bossRig = staging.rigId;
+  nSlots = staging.nSlots;
+  memcpy(slotVariant, staging.slotVariant, nSlots);
   return true;
 }
 

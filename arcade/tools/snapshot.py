@@ -46,7 +46,7 @@ def main():
         for r in inputs:
             frame = game.step(r, DT)
         cam, objs, hud, flags = frame
-        (out / f"{name}.frame").write_bytes(g3d.pack_frame(seq, cam, objs, hud, flags=flags))
+        (out / f"{name}.frame").write_bytes(g3d.pack_frame(seq, cam, objs, hud, rigs=game.rigs(), flags=flags))
         seq += 1
 
     run("1_ready", [raw()])
@@ -58,6 +58,15 @@ def main():
     run("3_walk_shoot", walk + shoot)
     run("4_menu", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A), raw(jy=-110)])
     run("5_missing", [raw(connected=5)])
+    # The day cycle at 8 points (holds and blends); NAME.sky next to NAME.frame is a g3d_scene_sky payload.
+    game = Game(scene)
+    run("6_ride", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A)] + [raw(jx=-30, jy=100)] * 20 + [raw(held=g3d.BTN_B)] * 3)
+    period = world.DAY_HOLD + world.DAY_BLEND
+    for k in range(8):
+        t = (k // 2) * period + (world.DAY_HOLD / 2 if k % 2 == 0 else world.DAY_HOLD + world.DAY_BLEND / 2)
+        name = f"7_{k}_day_{t:04.0f}s"
+        (out / f"{name}.sky").write_bytes(g3d.pack_sky(*world.sky_at(t)))
+        run(name, [raw()])
     print(f"wrote {out}/scene.bin and {seq} frames")
 
 

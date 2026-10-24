@@ -20,9 +20,21 @@ struct Params {
   float heightScale;                      // m per height unit
   uint16_t grassA, grassB;                // RGB565, already graded
   float lightYaw, lightPitch;             // rad
+  float groundFog;                        // 0..1, from the Look (height fog near the ground)
+};
+
+// Scattered scenery (api.md §3.2 kind 2); y is resolved from the terrain when the scene is applied.
+struct Rock {
+  float x, y, z, yaw, scale;  // m, rad, factor
+  uint8_t mesh, tint;         // gen::MESHES id, palette index (0 keeps the mesh colours)
 };
 
 extern Params params;
+extern Rock rocks[MAX_ROCKS];
+extern int nRocks;
+extern uint8_t bossRig;          // scene header rig_id; the boss frame rig block uses its slot variants
+extern uint8_t slotVariant[32];  // variant index per slot (0 = empty)
+extern int nSlots;
 extern int8_t heights[MAX_N * MAX_N];  // row-major: heights[j * terrainN + i], i along X
 extern uint16_t palette[32];          // object palette after the Look's grading
 
@@ -34,6 +46,9 @@ float terrainHeight(float x, float z);  // bilinear, clamped to the edge (matche
 bool uploadBegin(const uint8_t* hdr, size_t n);
 bool uploadChunk(uint8_t kind, uint8_t index, const uint8_t* data, size_t n);
 bool uploadCommit(uint16_t crc);
-bool applyUpload();  // copies a committed upload into the live scene; true means re-bake
+// Sky update (api.md §3.6, g3d_scene_sky): sky/fog/grass colours, fog distances, sun and Look, without
+// touching terrain or rocks. Python sends one every fraction of a second while the time of day changes.
+bool uploadSky(const uint8_t* data, size_t n);
+bool applyUpload();  // applies a committed upload, then a pending sky update; true means re-bake
 
 }  // namespace scene

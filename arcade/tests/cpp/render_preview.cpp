@@ -1,6 +1,7 @@
 // Desktop build of the MCU renderer: writes one frame as a 2x-scaled PPM.
 //   render_preview out.ppm [seconds]                       demo orbit at `seconds`
 //   render_preview out.ppm --scene scene.bin --frame f.bin  a Python scene upload plus one g3d_frame
+//   ... --sky sky.bin                                      plus one g3d_scene_sky payload (time of day)
 // scene.bin: u16 header length, header, u8 chunk count, {u8 kind, u8 index, u16 length, data}..., u16 crc.
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,14 +75,23 @@ int main(int argc, char** argv) {
   const char* out = argc > 1 ? argv[1] : "preview.ppm";
   const char* scenePath = nullptr;
   const char* framePath = nullptr;
+  const char* skyPath = nullptr;
   float seconds = 0;
   for (int i = 2; i < argc; ++i) {
     if (!strcmp(argv[i], "--scene") && i + 1 < argc) scenePath = argv[++i];
     else if (!strcmp(argv[i], "--frame") && i + 1 < argc) framePath = argv[++i];
+    else if (!strcmp(argv[i], "--sky") && i + 1 < argc) skyPath = argv[++i];
     else seconds = strtof(argv[i], nullptr);
   }
   scene::buildDemo(1);
   if (scenePath) loadScene(scenePath);
+  if (skyPath) {
+    const std::vector<uint8_t> sky = readFile(skyPath);
+    if (!scene::uploadSky(sky.data(), sky.size()) || !scene::applyUpload()) {
+      fprintf(stderr, "%s: sky rejected\n", skyPath);
+      return 1;
+    }
+  }
   render::begin();
   g3d::Frame frame = render::demoFrame(seconds);
   if (framePath) {

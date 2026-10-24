@@ -23,7 +23,9 @@ def test_ready_shows_prompt_and_a_starts():
     game = Game(world.make_scene(1))
     _, objs, hud, _ = game.step(raw(), DT)
     assert game.state == READY and hud.state == g3d.STATE_READY and hud.msg == 12
-    assert len(objs) == 1  # just the PC
+    assert objs == []  # the PC is drawn as rigs now
+    boss, horse, rider = game.rigs()
+    assert (boss.rig_id, horse.rig_id, rider.rig_id) == (1, 3, 4) and horse.char_light and rider.char_light
     game.step(raw(pressed=g3d.BTN_A), DT)
     assert game.state == FIGHT
 
@@ -110,3 +112,30 @@ def test_axis_vector_parsing():
     assert axis_vector("z", invert=True) == (0.0, 0.0, -1.0)
     with pytest.raises(ValueError):
         axis_vector("w")
+
+
+def test_shooting_does_not_turn_the_horse():
+    game = started()
+    yaw = game.player.yaw
+    game.camera.yaw += 1.0  # look well off to the side, then shoot
+    for _ in range(3):
+        game.step(raw(held=g3d.BTN_B), DT)
+    assert game.player.bullets and game.player.yaw == yaw
+
+
+def test_idle_horse_stands_and_moving_gallops():
+    game = started()
+    game.step(raw(), DT)
+    horse = game.rigs()[1]
+    assert game.player.standing and horse.anim == 2  # stand
+    game.step(raw(jy=120), DT)
+    assert not game.player.standing and game.rigs()[1].anim == 0  # gallop
+
+
+def test_stick_steers_horse_and_camera_together():
+    game = started()
+    offset = game.camera.yaw - game.player.yaw
+    for _ in range(10):
+        game.step(raw(jx=120), DT)  # full right, no throttle: turn on the spot
+    assert game.player.yaw < -0.5  # turning right lowers yaw
+    assert abs((game.camera.yaw - game.player.yaw) - offset) < 1e-9

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turn assets/ (meshes, palette, default Look) into sketch/gen/ and python/gen/.
+"""Turn assets/ (meshes, palette, Looks) into sketch/gen/ and python/gen/.
 
     python3 tools/mesh_build.py          (run from arcade/; rewrites the generated files)
     python3 tools/mesh_build.py --check  (exit 1 if the generated files are stale)
@@ -178,6 +178,8 @@ def build():
                 f"static const uint16_t {name}_tris[] = {{{tris}}};",
                 f"static const uint16_t {name}_group_end[] = {{{', '.join(ends)}}};",
                 f"static const uint8_t {name}_group_color[] = {{{', '.join(str(g[0]) for g in mesh['groups'])}}};", ""]
+    out += [f"constexpr uint8_t MESH_{meshes[mid][0]['name'].upper()} = {mid};" for mid in sorted(meshes)]
+    out.append("")
     out.append(f"constexpr int MESH_COUNT = {count};")
     out.append("static const Mesh MESHES[MESH_COUNT] = {")
     for mid in range(count):
@@ -206,11 +208,12 @@ def build():
             "  uint8_t gamma;",
             "  uint16_t lift, gain;",
             "  uint8_t posterize, dither;",
+            "  uint8_t groundFog;  // 0..255: height fog strength near the ground (api.md §3.2 byte 75)",
             "};",
             f"constexpr Look DEFAULT_LOOK = {{{{{', '.join(u16(v) for v in look_palette)}}}, "
             f"{look['grade_mode']}, {look['saturation']}, {look['contrast']}, {look['brightness']}, {look['gamma']}, "
             f"{u16(rgb565(hex_rgb(look['lift'])))}, {u16(rgb565(hex_rgb(look['gain'])))}, "
-            f"{look['posterize']}, {look['dither']}}};",
+            f"{look['posterize']}, {look['dither']}, {look.get('ground_fog', 0)}}};",
             "",
             "// palette.json scene_defaults; the demo scene uses them until Python commits a scene.",
             f"constexpr uint16_t SCENE_SKY_TOP = {u16(scene['sky_top'])}, SCENE_SKY_HORIZON = {u16(scene['sky_horizon'])},",
@@ -241,7 +244,24 @@ def build():
     out.append("")
     mesh_ids_py = "\n".join(out)
 
+    # Every Look as its 76 B kind 3 block (api.md §3.2) plus the scene header overrides (api.md §5.4).
+    out = [f'"""{header}"""', "", "# Look name -> {'block': kind 3 chunk bytes, 'scene': scene_defaults overrides}.",
+           "LOOKS = {"]
+    for path in sorted((ASSETS / "looks").glob("*.json")):
+        lk, pal = load_look(path.stem, colors)
+        block = b"".join(v.to_bytes(2, "little") for v in pal)
+        block += bytes([lk["grade_mode"], lk["saturation"], lk["contrast"], lk["brightness"] & 0xFF, lk["gamma"]])
+        block += rgb565(hex_rgb(lk["lift"])).to_bytes(2, "little") + rgb565(hex_rgb(lk["gain"])).to_bytes(2, "little")
+        block += bytes([lk["posterize"], lk["dither"], lk.get("ground_fog", 0)])
+        assert len(block) == 76
+        over = {k: scene_color(v) if k in ("sky_top", "sky_horizon", "fog_color", "grass_a", "grass_b") else v
+                for k, v in lk.get("scene", {}).items()}
+        out.append(f"    {path.stem!r}: {{'block': bytes.fromhex({block.hex()!r}), 'scene': {over!r}}},")
+    out += ["}", ""]
+    looks_py = "\n".join(out)
+
     return {
+        ROOT / "python" / "gen" / "looks.py": looks_py,
         ROOT / "sketch" / "gen" / "meshes.h": meshes_h,
         ROOT / "sketch" / "gen" / "palette.h": palette_h,
         ROOT / "python" / "gen" / "__init__.py": f'"""{header}"""\n',

@@ -15,11 +15,11 @@ struct Mesh {
   float radius;            // bounding sphere around the origin
 };
 
-// pc: 60 tris, 46 verts
-static const float pc_verts[] = {-0.0350f, 0.0000f, -0.0850f, -0.1850f, 0.0000f, -0.0850f, -0.1950f, 0.8000f, -0.0950f, -0.0250f, 0.8000f, -0.0950f, -0.1850f, 0.0000f, 0.0850f, -0.1950f, 0.8000f, 0.0950f, -0.0350f, 0.0000f, 0.0850f, -0.0250f, 0.8000f, 0.0950f, 0.1850f, 0.0000f, -0.0850f, 0.0350f, 0.0000f, -0.0850f, 0.0250f, 0.8000f, -0.0950f, 0.1950f, 0.8000f, -0.0950f, 0.0350f, 0.0000f, 0.0850f, 0.0250f, 0.8000f, 0.0950f, 0.1850f, 0.0000f, 0.0850f, 0.1950f, 0.8000f, 0.0950f, 0.2500f, 0.7500f, -0.1500f, -0.2500f, 0.7500f, -0.1500f, -0.2100f, 1.4200f, -0.1300f, 0.2100f, 1.4200f, -0.1300f, -0.2500f, 0.7500f, 0.1500f, -0.2100f, 1.4200f, 0.1300f, 0.2500f, 0.7500f, 0.1500f, 0.2100f, 1.4200f, 0.1300f, 0.2650f, 0.8400f, -0.1650f, -0.2650f, 0.8400f, -0.1650f, -0.2600f, 0.9500f, -0.1600f, 0.2600f, 0.9500f, -0.1600f, -0.2650f, 0.8400f, 0.1650f, -0.2600f, 0.9500f, 0.1600f, 0.2650f, 0.8400f, 0.1650f, 0.2600f, 0.9500f, 0.1600f, -0.1200f, 1.4400f, -0.1200f, 0.1200f, 1.4400f, -0.1200f, 0.1200f, 1.4400f, 0.1200f, -0.1200f, 1.4400f, 0.1200f, 0.1200f, 1.7000f, -0.1200f, 0.1200f, 1.7000f, 0.1200f, -0.1200f, 1.7000f, -0.1200f, -0.1200f, 1.7000f, 0.1200f, -0.3000f, 0.5000f, -0.1600f, 0.3000f, 0.5000f, -0.1600f, 0.0000f, 1.4200f, -0.1600f, 0.0000f, 1.4200f, -0.2400f, 0.3000f, 0.5000f, -0.2400f, -0.3000f, 0.5000f, -0.2400f};
-static const uint16_t pc_tris[] = {16, 17, 18, 16, 18, 19, 17, 20, 21, 17, 21, 18, 20, 22, 23, 20, 23, 21, 22, 16, 19, 22, 19, 23, 22, 20, 17, 22, 17, 16, 19, 18, 21, 19, 21, 23, 0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 6, 7, 4, 7, 5, 6, 0, 3, 6, 3, 7, 6, 4, 1, 6, 1, 0, 8, 9, 10, 8, 10, 11, 9, 12, 13, 9, 13, 10, 12, 14, 15, 12, 15, 13, 14, 8, 11, 14, 11, 15, 14, 12, 9, 14, 9, 8, 36, 38, 39, 36, 39, 37, 38, 36, 33, 38, 33, 32, 40, 41, 42, 43, 44, 45, 45, 44, 41, 45, 41, 40, 44, 43, 42, 44, 42, 41, 43, 45, 40, 43, 40, 42, 24, 25, 26, 24, 26, 27, 25, 28, 29, 25, 29, 26, 28, 30, 31, 28, 31, 29, 30, 24, 27, 30, 27, 31, 32, 33, 34, 32, 34, 35, 33, 36, 37, 33, 37, 34, 38, 32, 35, 38, 35, 39, 35, 34, 37, 35, 37, 39};
-static const uint16_t pc_group_end[] = {12, 44, 52, 60};
-static const uint8_t pc_group_color[] = {11, 12, 13, 14};
+// pc: 59 tris, 56 verts
+static const float pc_verts[] = {-0.1850f, 0.0000f, 0.0000f, -0.0575f, 0.0000f, 0.0736f, -0.0525f, 0.6000f, 0.0823f, -0.1950f, 0.6000f, 0.0000f, -0.0575f, 0.0000f, -0.0736f, -0.0525f, 0.6000f, -0.0823f, 0.0150f, 0.0000f, 0.0000f, 0.1425f, 0.0000f, 0.0736f, 0.1475f, 0.6000f, 0.0823f, 0.0050f, 0.6000f, 0.0000f, 0.1425f, 0.0000f, -0.0736f, 0.1475f, 0.6000f, -0.0823f, 0.2500f, 0.5000f, -0.1700f, -0.2500f, 0.5000f, -0.1700f, -0.2200f, 1.4200f, -0.1300f, 0.2200f, 1.4200f, -0.1300f, -0.2500f, 0.5000f, 0.1700f, -0.2200f, 1.4200f, 0.1300f, 0.2500f, 0.5000f, 0.1700f, 0.2200f, 1.4200f, 0.1300f, 0.2500f, 0.8600f, -0.1650f, -0.2500f, 0.8600f, -0.1650f, -0.2450f, 0.9700f, -0.1600f, 0.2450f, 0.9700f, -0.1600f, -0.2500f, 0.8600f, 0.1650f, -0.2450f, 0.9700f, 0.1600f, 0.2500f, 0.8600f, 0.1650f, 0.2450f, 0.9700f, 0.1600f, 0.1100f, 1.4400f, -0.1100f, 0.1100f, 1.6800f, -0.1100f, 0.1100f, 1.6800f, 0.1200f, 0.1100f, 1.4400f, 0.1200f, -0.1100f, 1.6800f, -0.1100f, -0.1100f, 1.6800f, 0.1200f, -0.1100f, 1.4400f, -0.1100f, -0.1100f, 1.4400f, 0.1200f, 0.3300f, 1.0000f, 0.0000f, 0.2900f, 0.9800f, -0.2700f, 0.2100f, 1.4600f, -0.1600f, 0.2500f, 1.4400f, 0.0300f, -0.2900f, 0.9800f, -0.2700f, -0.2100f, 1.4600f, -0.1600f, -0.3300f, 1.0000f, 0.0000f, -0.2500f, 1.4400f, 0.0300f, -0.2102f, 1.3600f, 0.0050f, -0.3033f, 1.3925f, 0.0379f, -0.3239f, 1.0389f, 0.3155f, -0.2386f, 1.0091f, 0.2853f, -0.2965f, 1.3275f, -0.0429f, -0.3177f, 0.9793f, 0.2414f, -0.2250f, 1.0000f, 0.1200f, -0.3375f, 1.0649f, 0.1168f, -0.3250f, 1.0592f, 0.4374f, -0.2500f, 1.0160f, 0.4396f, -0.3375f, 0.9351f, 0.1232f, -0.3250f, 0.9727f, 0.4418f};
+static const uint16_t pc_tris[] = {12, 13, 14, 12, 14, 15, 13, 16, 17, 13, 17, 14, 16, 18, 19, 16, 19, 17, 18, 12, 15, 18, 15, 19, 15, 14, 17, 15, 17, 19, 44, 45, 46, 44, 46, 47, 45, 48, 49, 45, 49, 46, 48, 44, 47, 48, 47, 49, 0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 0, 3, 4, 3, 5, 6, 7, 8, 6, 8, 9, 7, 10, 11, 7, 11, 8, 10, 6, 9, 10, 9, 11, 29, 32, 33, 29, 33, 30, 32, 29, 28, 32, 28, 34, 36, 37, 38, 36, 38, 39, 37, 40, 41, 37, 41, 38, 40, 42, 43, 40, 43, 41, 20, 21, 22, 20, 22, 23, 21, 24, 25, 21, 25, 22, 24, 26, 27, 24, 27, 25, 26, 20, 23, 26, 23, 27, 28, 29, 30, 28, 30, 31, 32, 34, 35, 32, 35, 33, 35, 31, 30, 35, 30, 33, 50, 51, 52, 50, 52, 53, 51, 54, 55, 51, 55, 52, 54, 50, 53, 54, 53, 55, 53, 52, 55};
+static const uint16_t pc_group_end[] = {16, 38, 46, 52, 58, 59};
+static const uint8_t pc_group_color[] = {11, 12, 13, 14, 15, 22};
 
 // bullet: 8 tris, 6 verts
 static const float bullet_verts[] = {0.0700f, 0.0000f, 0.0000f, 0.0000f, 0.0700f, 0.0000f, 0.0000f, 0.0000f, 0.4000f, 0.0000f, 0.0000f, -0.1200f, -0.0700f, 0.0000f, 0.0000f, -0.0000f, -0.0700f, 0.0000f};
@@ -153,9 +153,124 @@ static const uint16_t arch_fragment_tris[] = {11, 10, 13, 18, 20, 21, 18, 21, 19
 static const uint16_t arch_fragment_group_end[] = {3, 19, 27};
 static const uint8_t arch_fragment_group_color[] = {8, 19, 20};
 
-constexpr int MESH_COUNT = 33;
+// pc_hips: 16 tris, 16 verts
+static const float pc_hips_verts[] = {-0.2150f, 0.0200f, -0.1350f, 0.2150f, 0.0200f, -0.1350f, 0.2500f, -0.3600f, -0.1700f, -0.2500f, -0.3600f, -0.1700f, 0.2150f, 0.0200f, 0.1350f, 0.2500f, -0.3600f, 0.1700f, -0.2150f, 0.0200f, 0.1350f, -0.2500f, -0.3600f, 0.1700f, 0.2300f, -0.0400f, -0.1500f, -0.2300f, -0.0400f, -0.1500f, -0.2250f, 0.0800f, -0.1450f, 0.2250f, 0.0800f, -0.1450f, -0.2300f, -0.0400f, 0.1500f, -0.2250f, 0.0800f, 0.1450f, 0.2300f, -0.0400f, 0.1500f, 0.2250f, 0.0800f, 0.1450f};
+static const uint16_t pc_hips_tris[] = {0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 6, 7, 4, 7, 5, 6, 0, 3, 6, 3, 7, 8, 9, 10, 8, 10, 11, 9, 12, 13, 9, 13, 10, 12, 14, 15, 12, 15, 13, 14, 8, 11, 14, 11, 15};
+static const uint16_t pc_hips_group_end[] = {8, 16};
+static const uint8_t pc_hips_group_color[] = {11, 13};
+
+// pc_chest: 16 tris, 16 verts
+static const float pc_chest_verts[] = {0.2100f, 0.0600f, -0.1300f, -0.2100f, 0.0600f, -0.1300f, -0.2200f, 0.5000f, -0.1300f, 0.2200f, 0.5000f, -0.1300f, -0.2100f, 0.0600f, 0.1300f, -0.2200f, 0.5000f, 0.1300f, 0.2100f, 0.0600f, 0.1300f, 0.2200f, 0.5000f, 0.1300f, 0.3200f, 0.2600f, 0.0000f, 0.2800f, 0.2400f, -0.2600f, 0.2000f, 0.5200f, -0.1500f, 0.2300f, 0.5000f, 0.0300f, -0.2800f, 0.2400f, -0.2600f, -0.2000f, 0.5200f, -0.1500f, -0.3200f, 0.2600f, 0.0000f, -0.2300f, 0.5000f, 0.0300f};
+static const uint16_t pc_chest_tris[] = {0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 6, 7, 4, 7, 5, 6, 0, 3, 6, 3, 7, 3, 2, 5, 3, 5, 7, 8, 9, 10, 8, 10, 11, 9, 12, 13, 9, 13, 10, 12, 14, 15, 12, 15, 13};
+static const uint16_t pc_chest_group_end[] = {10, 16};
+static const uint8_t pc_chest_group_color[] = {11, 12};
+
+// pc_head: 10 tris, 8 verts
+static const float pc_head_verts[] = {0.1100f, 0.0050f, -0.1100f, 0.1100f, 0.2550f, -0.1100f, 0.1100f, 0.2550f, 0.1200f, 0.1100f, 0.0050f, 0.1200f, -0.1100f, 0.2550f, -0.1100f, -0.1100f, 0.2550f, 0.1200f, -0.1100f, 0.0050f, -0.1100f, -0.1100f, 0.0050f, 0.1200f};
+static const uint16_t pc_head_tris[] = {1, 4, 5, 1, 5, 2, 4, 1, 0, 4, 0, 6, 0, 1, 2, 0, 2, 3, 4, 6, 7, 4, 7, 5, 7, 3, 2, 7, 2, 5};
+static const uint16_t pc_head_group_end[] = {4, 10};
+static const uint8_t pc_head_group_color[] = {12, 14};
+
+// pc_arm: 6 tris, 6 verts
+static const float pc_arm_verts[] = {0.0650f, 0.0400f, 0.0000f, -0.0325f, 0.0400f, 0.0563f, -0.0250f, -0.5400f, 0.0433f, 0.0500f, -0.5400f, 0.0000f, -0.0325f, 0.0400f, -0.0563f, -0.0250f, -0.5400f, -0.0433f};
+static const uint16_t pc_arm_tris[] = {0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 0, 3, 4, 3, 5};
+static const uint16_t pc_arm_group_end[] = {6};
+static const uint8_t pc_arm_group_color[] = {11};
+
+// pc_arm_r: 13 tris, 12 verts
+static const float pc_arm_r_verts[] = {0.0650f, 0.0400f, 0.0000f, -0.0325f, 0.0400f, 0.0563f, -0.0250f, -0.5400f, 0.0433f, 0.0500f, -0.5400f, 0.0000f, -0.0325f, 0.0400f, -0.0563f, -0.0250f, -0.5400f, -0.0433f, 0.0800f, -0.3200f, 0.0200f, -0.0400f, -0.3200f, 0.0893f, -0.0275f, -0.6600f, 0.0676f, 0.0550f, -0.6600f, 0.0200f, -0.0400f, -0.3200f, -0.0493f, -0.0275f, -0.6600f, -0.0276f};
+static const uint16_t pc_arm_r_tris[] = {0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 0, 3, 4, 3, 5, 6, 7, 8, 6, 8, 9, 7, 10, 11, 7, 11, 8, 10, 6, 9, 10, 9, 11, 9, 8, 11};
+static const uint16_t pc_arm_r_group_end[] = {6, 12, 13};
+static const uint8_t pc_arm_r_group_color[] = {11, 15, 22};
+
+// pc_thigh: 6 tris, 6 verts
+static const float pc_thigh_verts[] = {0.0900f, 0.0300f, 0.0000f, -0.0450f, 0.0300f, 0.0779f, -0.0375f, -0.4400f, 0.0650f, 0.0750f, -0.4400f, 0.0000f, -0.0450f, 0.0300f, -0.0779f, -0.0375f, -0.4400f, -0.0650f};
+static const uint16_t pc_thigh_tris[] = {0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 0, 3, 4, 3, 5};
+static const uint16_t pc_thigh_group_end[] = {6};
+static const uint8_t pc_thigh_group_color[] = {12};
+
+// pc_shin: 6 tris, 6 verts
+static const float pc_shin_verts[] = {0.0750f, 0.0200f, 0.0000f, -0.0375f, 0.0200f, 0.0650f, -0.0350f, -0.4500f, 0.0606f, 0.0700f, -0.4500f, 0.0000f, -0.0375f, 0.0200f, -0.0650f, -0.0350f, -0.4500f, -0.0606f};
+static const uint16_t pc_shin_tris[] = {0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 0, 3, 4, 3, 5};
+static const uint16_t pc_shin_group_end[] = {6};
+static const uint8_t pc_shin_group_color[] = {4};
+
+// horse_body: 22 tris, 16 verts
+static const float horse_body_verts[] = {-0.2800f, -0.3594f, -0.8312f, 0.2800f, -0.3594f, -0.8312f, 0.3000f, -0.3093f, 0.8218f, -0.3000f, -0.3093f, 0.8218f, 0.2800f, 0.2594f, -0.8688f, 0.3000f, 0.4093f, 0.7782f, -0.2800f, 0.2594f, -0.8688f, -0.3000f, 0.4093f, 0.7782f, 0.3400f, 0.3200f, -0.3200f, 0.3400f, 0.4400f, -0.3200f, 0.3400f, 0.4400f, 0.2200f, 0.3400f, 0.3200f, 0.2200f, -0.3400f, 0.4400f, -0.3200f, -0.3400f, 0.4400f, 0.2200f, -0.3400f, 0.3200f, -0.3200f, -0.3400f, 0.3200f, 0.2200f};
+static const uint16_t horse_body_tris[] = {0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 6, 7, 4, 7, 5, 6, 0, 3, 6, 3, 7, 6, 4, 1, 6, 1, 0, 3, 2, 5, 3, 5, 7, 8, 9, 10, 8, 10, 11, 12, 14, 15, 12, 15, 13, 12, 9, 8, 12, 8, 14, 15, 11, 10, 15, 10, 13, 9, 12, 13, 9, 13, 10};
+static const uint16_t horse_body_group_end[] = {12, 20, 22};
+static const uint8_t horse_body_group_color[] = {2, 13, 21};
+
+// horse_neck: 14 tris, 16 verts
+static const float horse_neck_verts[] = {-0.1600f, -0.1956f, 0.1280f, 0.1600f, -0.1956f, 0.1280f, 0.1100f, 0.3987f, 0.5238f, -0.1100f, 0.3987f, 0.5238f, 0.1600f, 0.0956f, -0.2280f, 0.1100f, 0.6013f, 0.2762f, -0.1600f, 0.0956f, -0.2280f, -0.1100f, 0.6013f, 0.2762f, -0.1260f, 0.3200f, -0.0120f, 0.0630f, 0.3826f, 0.0774f, 0.0000f, 0.5494f, -0.1726f, 0.0630f, 0.2574f, -0.1014f, -0.1260f, 0.5000f, 0.1500f, 0.0630f, 0.5626f, 0.2394f, 0.0000f, 0.7294f, -0.0106f, 0.0630f, 0.4374f, 0.0606f};
+static const uint16_t horse_neck_tris[] = {0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 6, 7, 4, 7, 5, 6, 0, 3, 6, 3, 7, 8, 9, 10, 9, 11, 10, 11, 8, 10, 12, 13, 14, 13, 15, 14, 15, 12, 14};
+static const uint16_t horse_neck_group_end[] = {8, 14};
+static const uint8_t horse_neck_group_color[] = {2, 12};
+
+// horse_head: 18 tris, 16 verts
+static const float horse_head_verts[] = {-0.1200f, -0.0772f, -0.1595f, 0.1200f, -0.0772f, -0.1595f, 0.0800f, -0.3848f, 0.4270f, -0.0800f, -0.3848f, 0.4270f, 0.1200f, 0.1772f, -0.0005f, 0.0800f, -0.2152f, 0.5330f, -0.1200f, 0.1772f, -0.0005f, -0.0800f, -0.2152f, 0.5330f, -0.1290f, 0.1200f, 0.0213f, -0.0069f, 0.1414f, 0.0073f, -0.1016f, 0.2702f, -0.0651f, -0.0741f, 0.0986f, -0.0886f, 0.0110f, 0.1200f, -0.0613f, 0.0659f, 0.1414f, 0.0486f, 0.1016f, 0.2702f, -0.0651f, 0.1331f, 0.0986f, -0.0473f};
+static const uint16_t horse_head_tris[] = {0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 6, 7, 4, 7, 5, 6, 0, 3, 6, 3, 7, 6, 4, 1, 6, 1, 0, 8, 9, 10, 9, 11, 10, 11, 8, 10, 12, 13, 14, 13, 15, 14, 15, 12, 14, 3, 2, 5, 3, 5, 7};
+static const uint16_t horse_head_group_end[] = {16, 18};
+static const uint8_t horse_head_group_color[] = {2, 4};
+
+// horse_tail: 6 tris, 6 verts
+static const float horse_tail_verts[] = {-0.0800f, 0.0000f, 0.0000f, 0.0400f, 0.0310f, -0.0620f, 0.0175f, -0.6304f, -0.3491f, -0.0350f, -0.6440f, -0.3220f, 0.0400f, -0.0310f, 0.0620f, 0.0175f, -0.6575f, -0.2949f};
+static const uint16_t horse_tail_tris[] = {0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 0, 3, 4, 3, 5};
+static const uint16_t horse_tail_group_end[] = {6};
+static const uint8_t horse_tail_group_color[] = {12};
+
+// horse_leg: 8 tris, 8 verts
+static const float horse_leg_verts[] = {-0.0800f, 0.1200f, -0.1200f, 0.0800f, 0.1200f, -0.1200f, 0.0550f, -0.5000f, -0.0700f, -0.0550f, -0.5000f, -0.0700f, 0.0800f, 0.1200f, 0.1200f, 0.0550f, -0.5000f, 0.0700f, -0.0800f, 0.1200f, 0.1200f, -0.0550f, -0.5000f, 0.0700f};
+static const uint16_t horse_leg_tris[] = {0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 6, 7, 4, 7, 5, 6, 0, 3, 6, 3, 7};
+static const uint16_t horse_leg_group_end[] = {8};
+static const uint8_t horse_leg_group_color[] = {2};
+
+// horse_shin: 13 tris, 12 verts
+static const float horse_shin_verts[] = {0.0600f, 0.0200f, 0.0000f, -0.0300f, 0.0200f, 0.0520f, -0.0240f, -0.4000f, 0.0416f, 0.0480f, -0.4000f, 0.0000f, -0.0300f, 0.0200f, -0.0520f, -0.0240f, -0.4000f, -0.0416f, 0.0600f, -0.4000f, 0.0000f, -0.0300f, -0.4000f, 0.0520f, -0.0375f, -0.4800f, 0.0650f, 0.0750f, -0.4800f, 0.0000f, -0.0300f, -0.4000f, -0.0520f, -0.0375f, -0.4800f, -0.0650f};
+static const uint16_t horse_shin_tris[] = {0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2, 4, 0, 3, 4, 3, 5, 6, 7, 8, 6, 8, 9, 7, 10, 11, 7, 11, 8, 10, 6, 9, 10, 9, 11, 9, 8, 11};
+static const uint16_t horse_shin_group_end[] = {6, 13};
+static const uint8_t horse_shin_group_color[] = {2, 4};
+
+constexpr uint8_t MESH_PC = 0;
+constexpr uint8_t MESH_BULLET = 1;
+constexpr uint8_t MESH_BOSS_SHOT = 2;
+constexpr uint8_t MESH_HOOK_HEAD = 3;
+constexpr uint8_t MESH_SPARK = 4;
+constexpr uint8_t MESH_SHOCKWAVE_RING = 5;
+constexpr uint8_t MESH_MOOSE_TORSO = 16;
+constexpr uint8_t MESH_MOOSE_NECK = 17;
+constexpr uint8_t MESH_MOOSE_HEAD = 18;
+constexpr uint8_t MESH_MOOSE_LEG_F = 19;
+constexpr uint8_t MESH_MOOSE_LEG_B = 20;
+constexpr uint8_t MESH_MOOSE_SHIN = 21;
+constexpr uint8_t MESH_ARMOR_PLATE_A = 22;
+constexpr uint8_t MESH_ARMOR_PLATE_B = 23;
+constexpr uint8_t MESH_CRYSTAL_A = 24;
+constexpr uint8_t MESH_CRYSTAL_B = 25;
+constexpr uint8_t MESH_ARMOR_BACK = 26;
+constexpr uint8_t MESH_HEAD_CAP = 27;
+constexpr uint8_t MESH_SIGIL_WEAK = 28;
+constexpr uint8_t MESH_ROCK_A = 29;
+constexpr uint8_t MESH_ROCK_B = 30;
+constexpr uint8_t MESH_PILLAR_BROKEN = 31;
+constexpr uint8_t MESH_ARCH_FRAGMENT = 32;
+constexpr uint8_t MESH_PC_HIPS = 33;
+constexpr uint8_t MESH_PC_CHEST = 34;
+constexpr uint8_t MESH_PC_HEAD = 35;
+constexpr uint8_t MESH_PC_ARM = 36;
+constexpr uint8_t MESH_PC_ARM_R = 37;
+constexpr uint8_t MESH_PC_THIGH = 38;
+constexpr uint8_t MESH_PC_SHIN = 39;
+constexpr uint8_t MESH_HORSE_BODY = 40;
+constexpr uint8_t MESH_HORSE_NECK = 41;
+constexpr uint8_t MESH_HORSE_HEAD = 42;
+constexpr uint8_t MESH_HORSE_TAIL = 43;
+constexpr uint8_t MESH_HORSE_LEG = 44;
+constexpr uint8_t MESH_HORSE_SHIN = 45;
+
+constexpr int MESH_COUNT = 46;
 static const Mesh MESHES[MESH_COUNT] = {
-    {pc_verts, pc_tris, pc_group_end, pc_group_color, 60, 4, 1.7084f},  // 0
+    {pc_verts, pc_tris, pc_group_end, pc_group_color, 59, 6, 1.6879f},  // 0
     {bullet_verts, bullet_tris, bullet_group_end, bullet_group_color, 8, 1, 0.4000f},  // 1
     {boss_shot_verts, boss_shot_tris, boss_shot_group_end, boss_shot_group_color, 8, 2, 0.7000f},  // 2
     {hook_head_verts, hook_head_tris, hook_head_group_end, hook_head_group_color, 12, 1, 0.3500f},  // 3
@@ -188,6 +303,19 @@ static const Mesh MESHES[MESH_COUNT] = {
     {rock_b_verts, rock_b_tris, rock_b_group_end, rock_b_group_color, 20, 2, 1.4492f},  // 30
     {pillar_broken_verts, pillar_broken_tris, pillar_broken_group_end, pillar_broken_group_color, 16, 2, 4.4686f},  // 31
     {arch_fragment_verts, arch_fragment_tris, arch_fragment_group_end, arch_fragment_group_color, 27, 3, 5.6658f},  // 32
+    {pc_hips_verts, pc_hips_tris, pc_hips_group_end, pc_hips_group_color, 16, 2, 0.4701f},  // 33
+    {pc_chest_verts, pc_chest_tris, pc_chest_group_end, pc_chest_group_color, 16, 2, 0.5770f},  // 34
+    {pc_head_verts, pc_head_tris, pc_head_group_end, pc_head_group_color, 10, 2, 0.3025f},  // 35
+    {pc_arm_verts, pc_arm_tris, pc_arm_group_end, pc_arm_group_color, 6, 1, 0.5423f},  // 36
+    {pc_arm_r_verts, pc_arm_r_tris, pc_arm_r_group_end, pc_arm_r_group_color, 13, 3, 0.6640f},  // 37
+    {pc_thigh_verts, pc_thigh_tris, pc_thigh_group_end, pc_thigh_group_color, 6, 1, 0.4464f},  // 38
+    {pc_shin_verts, pc_shin_tris, pc_shin_group_end, pc_shin_group_color, 6, 1, 0.4554f},  // 39
+    {horse_body_verts, horse_body_tris, horse_body_group_end, horse_body_group_color, 22, 3, 0.9489f},  // 40
+    {horse_neck_verts, horse_neck_tris, horse_neck_group_end, horse_neck_group_color, 14, 2, 0.7295f},  // 41
+    {horse_head_verts, horse_head_tris, horse_head_group_end, horse_head_group_color, 18, 2, 0.5803f},  // 42
+    {horse_tail_verts, horse_tail_tris, horse_tail_group_end, horse_tail_group_color, 6, 1, 0.7209f},  // 43
+    {horse_leg_verts, horse_leg_tris, horse_leg_group_end, horse_leg_group_color, 8, 1, 0.5079f},  // 44
+    {horse_shin_verts, horse_shin_tris, horse_shin_group_end, horse_shin_group_color, 13, 2, 0.4858f},  // 45
 };
 
 }  // namespace gen

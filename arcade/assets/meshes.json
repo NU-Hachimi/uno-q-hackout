@@ -3,12 +3,12 @@
   {
    "id": 0,
    "name": "pc",
-   "tris": 60,
+   "tris": 59,
    "attach": {
     "hand": [
-     0.28,
-     1.1,
-     0.12
+     -0.3,
+     1.02,
+     0.45
     ]
    }
   },
@@ -121,6 +121,71 @@
    "id": 32,
    "name": "arch_fragment",
    "tris": 27
+  },
+  {
+   "id": 33,
+   "name": "pc_hips",
+   "tris": 16
+  },
+  {
+   "id": 34,
+   "name": "pc_chest",
+   "tris": 16
+  },
+  {
+   "id": 35,
+   "name": "pc_head",
+   "tris": 10
+  },
+  {
+   "id": 36,
+   "name": "pc_arm",
+   "tris": 6
+  },
+  {
+   "id": 37,
+   "name": "pc_arm_r",
+   "tris": 13
+  },
+  {
+   "id": 38,
+   "name": "pc_thigh",
+   "tris": 6
+  },
+  {
+   "id": 39,
+   "name": "pc_shin",
+   "tris": 6
+  },
+  {
+   "id": 40,
+   "name": "horse_body",
+   "tris": 22
+  },
+  {
+   "id": 41,
+   "name": "horse_neck",
+   "tris": 14
+  },
+  {
+   "id": 42,
+   "name": "horse_head",
+   "tris": 18
+  },
+  {
+   "id": 43,
+   "name": "horse_tail",
+   "tris": 6
+  },
+  {
+   "id": 44,
+   "name": "horse_leg",
+   "tris": 8
+  },
+  {
+   "id": 45,
+   "name": "horse_shin",
+   "tris": 13
   }
  ]
 }

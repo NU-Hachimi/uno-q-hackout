@@ -10,5 +10,8 @@
  "posterize": 0,
  "dither": 0,
  "palette": {},
- "scene": {}
+ "scene": {
+  "fog_near": 8
+ },
+ "ground_fog": 120
 }

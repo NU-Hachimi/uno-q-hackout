@@ -1,0 +1,26 @@
+{
+ "_doc": "月夜：蓝色月光、雾更近，符印比白天更亮",
+ "grade_mode": 1,
+ "saturation": 50,
+ "contrast": 140,
+ "brightness": -10,
+ "gamma": 60,
+ "lift": "#04081a",
+ "gain": "#b8c8ec",
+ "posterize": 0,
+ "dither": 0,
+ "palette": {
+  "SIGIL": "#c8f8ff",
+  "SIGIL_DIM": "#70c0e0"
+ },
+ "scene": {
+  "sky_top": "#141c30",
+  "sky_horizon": "#46536e",
+  "fog_color": "#3c475e",
+  "fog_near": 10,
+  "fog_far": 45,
+  "light_yaw": 160,
+  "light_pitch": 50
+ },
+ "ground_fog": 170
+}

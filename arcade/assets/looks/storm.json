@@ -17,5 +17,6 @@
   "fog_near": 12,
   "fog_far": 45,
   "light_pitch": 44
- }
+ },
+ "ground_fog": 130
 }

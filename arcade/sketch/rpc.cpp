@@ -5,6 +5,7 @@
 #include <zephyr/kernel.h>
 
 #include "gen/meshes.h"
+#include "gen/rigs.h"
 #include "inputs.h"
 #include "render.h"
 #include "scene.h"
@@ -49,7 +50,7 @@ Reply hello(int version) {
   caps[6] = g3d::MAX_OBJ;
   caps[7] = 32;                // max slots
   caps[8] = gen::MESH_COUNT;
-  caps[9] = 0;                 // rigs: none built yet
+  caps[9] = gen::RIG_COUNT;    // rig ids 1..RIG_COUNT-1 (gaps are empty)
   caps[10] = G3D_BIN_RETURN;   // bit0 bin return; bit1 per-pixel grading (not yet)
   return reply(caps, sizeof(caps));
 }
@@ -65,6 +66,13 @@ bool sceneChunk(int kind, int index, MsgPack::bin_t<uint8_t> data) {
   if (kind < 0 || kind > 255 || index < 0 || index > 255) return false;
   k_mutex_lock(&lock, K_FOREVER);
   const bool ok = scene::uploadChunk(uint8_t(kind), uint8_t(index), data.data(), data.size());
+  k_mutex_unlock(&lock);
+  return ok;
+}
+
+bool sceneSky(MsgPack::bin_t<uint8_t> data) {
+  k_mutex_lock(&lock, K_FOREVER);
+  const bool ok = scene::uploadSky(data.data(), data.size());
   k_mutex_unlock(&lock);
   return ok;
 }
@@ -118,6 +126,7 @@ void begin() {
   Bridge.provide("g3d_scene_begin", sceneBegin);
   Bridge.provide("g3d_scene_chunk", sceneChunk);
   Bridge.provide("g3d_scene_commit", sceneCommit);
+  Bridge.provide("g3d_scene_sky", sceneSky);
   Bridge.provide("g3d_frame", frame);
   Bridge.provide("g3d_release", release);
 }

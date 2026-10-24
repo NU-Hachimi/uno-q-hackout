@@ -1,0 +1,23 @@
+{
+ "_doc": "清晨：低角度的东方光、冷色暗部、粉色高光",
+ "grade_mode": 1,
+ "saturation": 84,
+ "contrast": 124,
+ "brightness": 4,
+ "gamma": 70,
+ "lift": "#10142a",
+ "gain": "#fff0e6",
+ "posterize": 0,
+ "dither": 0,
+ "palette": {},
+ "scene": {
+  "sky_top": "#8a98b4",
+  "sky_horizon": "#e8cfc4",
+  "fog_color": "#d8c8c4",
+  "fog_near": 14,
+  "fog_far": 55,
+  "light_yaw": 64,
+  "light_pitch": 14
+ },
+ "ground_fog": 210
+}
