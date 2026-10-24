@@ -15,6 +15,7 @@ import math  # noqa: E402
 
 import g3d  # noqa: E402
 import world  # noqa: E402
+from boss import CHARGING, STRIKING  # noqa: E402
 from game import Game  # noqa: E402
 
 DT = 0.05
@@ -103,6 +104,28 @@ def main():
         name = f"16_{k}_day_{t:04.0f}s"
         (out / f"{name}.sky").write_bytes(g3d.pack_sky(*world.sky_at(t)))
         run(name, [raw()])
+    # The stomp's dust ring halfway out, seen from 20 m (outside its reach)
+    boss = game.boss
+    look_at((boss.x, boss.y + 3, boss.z), 20)
+    boss.state, boss.attack = STRIKING, "rear_stomp"
+    boss.play("rear_stomp")
+    steps = 0
+    while not (boss.waves and boss.waves[0][3] >= 7.0) and steps < 100:
+        game.step(raw(), DT)
+        steps += 1
+    run("17_stomp_ring", [raw()])
+    # Mid-charge: the PC 30 m away gets run at, head down
+    game = Game(scene, seed=7)
+    game.step(raw(pressed=g3d.BTN_A, held=g3d.BTN_A), DT)  # Ready -> Fight
+    boss = game.boss
+    game.player.x, game.player.z = boss.x, boss.z - 30
+    game.player.yaw = game.camera.yaw = 0.0
+    boss.timer = 0.0
+    steps = 0
+    while not (boss.state == CHARGING and boss.charge_left < 22) and steps < 200:
+        game.step(raw(), DT)
+        steps += 1
+    run("18_charge", [raw()])
 
     def run_until(name, done, inputs=None, limit=600):
         """Step with `inputs` (default: nothing pressed) until done() holds, then save that frame."""
@@ -117,12 +140,12 @@ def main():
 
     # Boss attacks on a fresh round (same seed, so the same parts as scene.bin).
     game = Game(scene, seed=7)
-    run("17_0_start", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A)])
+    run("19_0_start", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A)])
     boss, p = game.boss, game.player
     p.x, p.z = 0.0, -6.0  # by the forelegs: close enough for the stomp
     boss.timer = 0.0
-    run_until("17_1_stomp_rears", lambda: boss.attack == "rear_stomp" and boss.phase() > 120)
-    run_until("17_2_stomp_ring", lambda: boss.waves and boss.waves[0][2] > 7.0)
+    run_until("19_1_stomp_rears", lambda: boss.attack == "rear_stomp" and boss.phase() > 120)
+    run_until("19_2_stomp_ring_close", lambda: boss.waves and boss.waves[0][3] > 7.0)
     boss.timer = 99.0  # no ground attacks while the hook frames are taken
     hump = next(c for c in boss.colliders() if c.hookable).centre()
     p.x, p.z = hump[0] + 12, hump[2]  # from the side: the standing boss's head hides the hump from the front
@@ -132,14 +155,14 @@ def main():
         game.camera.yaw = math.atan2(dx, dz)
         game.camera.pitch = math.atan2(dy, math.hypot(dx, dz))
     p.yaw = game.camera.yaw
-    run("18_0_hook", [raw(pressed=g3d.BTN_C)])
-    run_until("18_1_shake_warning", lambda: boss.jump_off_warning(p) and boss.phase() > 20)
-    run_until("18_2_thrown", lambda: p.airborne and p.vy < 2.0)
+    run("20_0_hook", [raw(pressed=g3d.BTN_C)])
+    run_until("20_1_shake_warning", lambda: boss.jump_off_warning(p) and boss.phase() > 20)
+    run_until("20_2_thrown", lambda: p.airborne and p.vy < 2.0)
     for slot in boss.legs:
         boss.damage(slot, 99)
     boss.broken.clear()
-    run_until("19_0_kneeling", lambda: boss.anim_time > 3.0)
-    run_until("19_1_rising", lambda: boss.state == "rising" and boss.phase() > 120, limit=400)
+    run_until("21_0_kneeling", lambda: boss.anim_time > 3.0)
+    run_until("21_1_rising", lambda: boss.state == "rising" and boss.phase() > 120, limit=400)
 
     # The finisher: every part broken, hooked on the shoulder hump, then B.
     import rig as rigmath  # noqa: E402
@@ -147,18 +170,18 @@ def main():
     for slot in boss.parts:
         boss.damage(slot, 99)
     boss.broken.clear()
-    run_until("20_0_standing_again", lambda: boss.state == "standing", limit=400)
+    run_until("22_0_standing_again", lambda: boss.state == "standing", limit=400)
     hump = next(c for c in boss.colliders() if c.hookable)
     bones, _ = boss.poses()
     top = (hump.centre()[0], hump.centre()[1] + hump.r, hump.centre()[2])
     p.hook, p.hook_bone = "hooked", hump.bone
     p.hook_local = rigmath.transform(rigmath.inverse(bones[hump.bone]), top)
     p.x, p.y, p.z = top
-    run("20_1_finish_prompt", [raw()])
-    run("21_execute_climb", [raw(pressed=g3d.BTN_B)] + [raw()] * 12)
-    run_until("22_execute_strike", lambda: game.finisher.struck >= 2)
-    run_until("23_execute_fall", lambda: game.finisher.time > SHATTER + 1.6)
-    run_until("24_victory", lambda: game.state == "win")
+    run("22_1_finish_prompt", [raw()])
+    run("23_execute_climb", [raw(pressed=g3d.BTN_B)] + [raw()] * 12)
+    run_until("24_execute_strike", lambda: game.finisher.struck >= 2)
+    run_until("25_execute_fall", lambda: game.finisher.time > SHATTER + 1.6)
+    run_until("26_victory", lambda: game.state == "win")
     print(f"wrote {out}/scene.bin and {seq} frames")
 
 

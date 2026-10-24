@@ -33,7 +33,7 @@ def make_boss(seed=1):
 
 def test_stands_still_until_it_attacks():
     scene, boss = make_boss()
-    pc = Player(scene, x=20.0, z=0.0)  # to the side, 20 m: outside attack range
+    pc = Player(scene, x=40.0, z=0.0)  # to the side, 40 m: outside attack and charge range
     yaw = boss.yaw
     for _ in range(200):
         boss.update(0.05, pc)
@@ -178,6 +178,94 @@ def test_feet_block_the_pc_but_the_belly_does_not():
     assert (pc.x, pc.z) == (0.0, 0.0)
 
 
+def stomp(boss, pc, seconds=3.0):
+    """Play rear_stomp from the start and keep updating until the ring is gone; returns the max ring count."""
+    boss.state, boss.attack = STRIKING, "rear_stomp"
+    boss.play("rear_stomp")
+    rings = 0
+    for _ in range(int(seconds / 0.05)):
+        boss.update(0.05, pc)
+        rings = max(rings, len(boss.objects()))
+    return rings
+
+
+def test_stomp_ring_hurts_pc_on_the_ground_inside_its_radius():
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-10.0)
+    assert stomp(boss, pc) == 1
+    assert pc.hp == 4 and boss.waves == []
+
+
+def test_stomp_ring_misses_pc_outside_its_radius():
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-20.0)
+    stomp(boss, pc)
+    assert pc.hp == 5
+
+
+def test_stomp_ring_misses_pc_off_the_ground():
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-10.0)
+    pc.airborne = True
+    stomp(boss, pc)
+    assert pc.hp == 5
+
+
+def test_stomp_ring_is_drawn_growing_on_the_ground():
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-30.0)
+    boss.state, boss.attack = STRIKING, "rear_stomp"
+    boss.play("rear_stomp")
+    scales = []
+    for _ in range(60):
+        boss.update(0.05, pc)
+        scales += [o.scale for o in boss.objects()]
+    assert scales and scales == sorted(scales) and scales[-1] <= 14.0
+    assert all(1 <= round(s * 16) <= 255 for s in scales)
+
+
+def test_far_pc_gets_charged_after_a_paw_wind_up():
+    from boss import CHARGING, PAWING
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-25.0)  # in front, beyond kicking range
+    boss.timer = 0.0
+    states, start = [], (boss.x, boss.z)
+    for _ in range(120):
+        boss.update(0.05, pc)
+        states.append(boss.state)
+        pc.invulnerable = 0
+    assert PAWING in states and CHARGING in states
+    assert states.index(PAWING) < states.index(CHARGING)
+    assert pc.hp == 4  # run down once
+    assert math.dist(start, (boss.x, boss.z)) > 25.0  # ran through and past
+    assert boss.state in (STANDING, TURNING)
+
+
+def test_charge_heading_locks_so_a_sidestep_dodges_it():
+    from boss import CHARGING
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-25.0)
+    boss.timer = 0.0
+    while boss.state != CHARGING:
+        boss.update(0.05, pc)
+    yaw = boss.yaw
+    pc.x = 8.0  # sidestep once it has set off
+    for _ in range(60):
+        boss.update(0.05, pc)
+    assert pc.hp == 5
+    assert boss.state != CHARGING or boss.yaw == yaw
+
+
+def test_near_pc_is_not_charged():
+    from boss import CHARGING, PAWING
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-10.0)
+    boss.timer = 0.0
+    for _ in range(80):
+        boss.update(0.05, pc)
+        assert boss.state not in (PAWING, CHARGING)
+
+
 def test_close_pc_gets_the_stomp_and_the_ring_hurts():
     scene, boss = make_boss()
     pc = Player(scene, x=0.0, z=-5.0)  # under the boss's chest
@@ -192,24 +280,14 @@ def test_close_pc_gets_the_stomp_and_the_ring_hurts():
     assert not boss.waves  # spread out to its full radius and gone
 
 
-def test_the_ring_spares_hooked_and_distant_pcs():
+def test_the_ring_spares_a_hooked_pc():
     scene, boss = make_boss()
-    near_but_hooked = Player(scene, x=0.0, z=-6.0)
-    near_but_hooked.hook = "hooked"
-    far = Player(scene, x=0.0, z=-20.0)  # beyond the 14 m ring
-    for pc in (near_but_hooked, far):
-        boss.waves = [[0.0, 0.0, 0.0, 1, 12.0]]
-        for _ in range(40):
-            boss._spread(0.05, pc)
-        assert pc.hp == 5
-
-
-def test_ring_objects_scale_and_sink():
-    scene, boss = make_boss()
-    boss.waves = [[0.0, 0.0, 10.0, 1, 12.0]]
-    ring = boss.shockwave_objects()[0]
-    ground = world.terrain_height(scene, 0.0, 0.0)
-    assert ring.scale == 10.0 and abs(ring.y - (ground - (0.35 * 10 - 1.2))) < 1e-9
+    pc = Player(scene, x=0.0, z=-6.0)
+    pc.hook = "hooked"
+    boss.waves = [[0.0, 0.0, 0.0, 0.0, 12.0, 1]]
+    for _ in range(40):
+        boss._spread(0.05, pc)
+    assert pc.hp == 5
 
 
 def hooked_pc(scene, boss):

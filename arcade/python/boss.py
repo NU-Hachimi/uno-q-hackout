@@ -1,11 +1,14 @@
 """The boss: attack cycle, the parts fitted this round, their health and the phases (docs/plan.md BOSS).
 
 It stands still between attacks. To attack the PC on the ground it turns slowly towards it, then rears
-and stomps (shockwave) when the PC is close, or kicks or sweeps further out. A PC hooked on for a while
-gets shaken: JUMP OFF with C in the window, or be thrown off and hurt.
+and stomps when the PC is close (a dust ring spreads across the ground and hurts a PC on the ground when it
+passes), or kicks or sweeps further out. A PC keeping its distance gets charged: the boss paws the ground
+with its head down while still turning, then locks its heading and runs straight through where the PC was;
+its chest and forelegs hurt the PC once if they reach it. A PC hooked on for a while gets shaken: JUMP OFF
+with C in the window, or be thrown off and hurt.
 Breaking both leg parts makes it kneel for a while, then rise; after that every few points of damage
 bring it down again. Breaking the legs and the back shatters the head cover and exposes the weak
-point, which can only be hurt while hooked on.
+point, which falls to the finisher (finisher.py).
 """
 
 import math
@@ -20,13 +23,18 @@ from gen.rigs import RIGS
 
 RIG_ID = 1
 LEG_PARTS = 2                     # leg parts fitted per round, plus the back and the head
-ANIM_SECONDS = {"idle": 4.0, "walk": 2.0, "punch_r": 2.4, "sweep": 2.6, "rear_stomp": 3.0, "shake": 4.0,
-                "kneel": 2.5, "rise": 2.5}
+ANIM_SECONDS = {"idle": 4.0, "walk": 2.0, "punch_r": 2.4, "sweep": 2.6, "rear_stomp": 2.4, "shake": 4.0,
+                "kneel": 2.5, "rise": 2.5, "paw": 1.4, "charge": 0.5}
 
 FAR_ATTACKS = ("punch_r", "sweep")
 ATTACK_RANGE = 14.0               # m; it only starts an attack when the PC is this close
 STOMP_RANGE = 7.0                 # m; closer than this (by the legs, under the belly) it rears and stomps
-SHOCKWAVE_MAX = 14.0              # m; the dust ring stops spreading here
+CHARGE_RANGE = 35.0               # m; between ATTACK_RANGE and this it charges instead
+CHARGE_SPEED = 14.0               # m/s
+CHARGE_OVERRUN = 8.0              # m it keeps running past where the PC stood when the charge began
+CHARGE_HIT_AHEAD = 4.0            # m ahead of the root: its chest and forelegs, what runs the PC down
+CHARGE_HIT_R = 3.5                # m, on the ground plane (the head is far above a mounted PC)
+CHARGE_EDGE = 20.0                # m kept from the map edge; the charge stops there
 SHAKE_AFTER = 2.5                 # s hooked on before it shakes
 THROW_PHASE = 73                  # shake phase of the throw event; JUMP OFF is shown until then
 KNEEL_HOLD = 12.0                 # s down on its knees after the kneel animation
@@ -39,9 +47,13 @@ RECOVER = 1.0                     # s standing still after an attack
 FLASH_SECONDS = 0.1               # hit_slot flash (two frames at 20 Hz)
 FOOT_CLEARANCE = 0.3              # m added to a shin's radius on the ground
 PC_CENTRE = 0.9                   # m above the PC's feet, for hit events
+SHOCKWAVE_RADIUS = 14.0           # m; the ring stops here, so standing farther out dodges it
+RING_MESH_RADIUS = 1.0            # m, outer radius of shockwave_ring at scale 1
+RING_LIFT = 0.2                   # m above the ground under the boss, so terrain bumps don't swallow the ring
 
 STANDING, TURNING, STRIKING, SHAKING, KNEELING, RISING, EXECUTED = (
     "standing", "turning", "striking", "shaking", "kneeling", "rising", "executed")
+PAWING, CHARGING = "pawing", "charging"
 
 
 def anim_ids(rig_data):
@@ -91,10 +103,11 @@ class Boss:
         self.state = STANDING
         self.timer = self.rng.uniform(*ATTACK_INTERVAL)
         self.attack = None
+        self.charge_left = 0.0     # m still to run in the current charge
+        self.charge_hit = False
         self.hooked_for = 0.0      # s the PC has been hooked on
         self.knelt = False         # it has knelt once (both legs broken)
-        self.damage_since = 0      # damage taken since it last rose
-        self.waves = []            # shockwaves: [x, z, radius, damage, speed]
+        self.damage_since = 0      # damage taken since it last knelt
         self.fade = 0.0            # 0..1 sinking into the fog after the finisher
         slots = self.rig["slots"]
         self.legs = [i for i in slots_tagged(self.rig, "leg") if self.variants[i]]
@@ -107,6 +120,7 @@ class Boss:
         self.hit_slot, self.hit_timer = 0xFF, 0.0
         self.broken = []   # (slot, world position, tint) broken since the game last read it, for debris
         self.shake = 0.0   # camera shake amplitude (m) from the latest event, read and cleared by the game
+        self.waves = []    # spreading shockwaves: [x, y, z, radius, speed, damage]
         self._cache = None
 
     # ---- animation -----------------------------------------------------------------------
@@ -136,37 +150,79 @@ class Boss:
         elif self.state == RISING:
             if self.anim_time >= ANIM_SECONDS["rise"]:
                 self._recover()
+        elif self.state in (STANDING, TURNING, PAWING) and self.hooked_for >= SHAKE_AFTER:
+            self.state, self.attack = SHAKING, "shake"
+            self.play("shake")
         elif self.state == STANDING:
             self.play("idle")
             self.timer -= dt
-            if self.hooked_for >= SHAKE_AFTER:
-                self.state, self.attack = SHAKING, "shake"
-                self.play("shake")
-            elif self.timer <= 0 and player.mounted and self._distance(player) <= ATTACK_RANGE:
+            if self.timer <= 0 and player.mounted and self._distance(player) <= CHARGE_RANGE:
                 self.state, self.timer = TURNING, MAX_TURN
         elif self.state == TURNING:
             self.timer -= dt
-            diff = _wrap(math.atan2(player.x - self.x, player.z - self.z) - self.yaw)  # the rig's front is +Z
-            step = TURN_RATE * dt
-            self.yaw = _wrap(self.yaw + max(-step, min(step, diff)))
+            diff = self._turn(player, dt)
             self.play("walk")
             if abs(diff) <= FACING or self.timer <= 0:
-                close = self._distance(player) <= STOMP_RANGE
-                self.state, self.attack = STRIKING, "rear_stomp" if close else self.rng.choice(FAR_ATTACKS)
-                self.play(self.attack)
+                self._choose(player)
+        elif self.state == PAWING:
+            self._turn(player, dt)  # still tracking: the heading locks when it sets off
+            if self.anim_time >= ANIM_SECONDS["paw"]:
+                if player.mounted:
+                    self.state, self.attack, self.charge_hit = CHARGING, "charge", False
+                    self.charge_left = self._distance(player) + CHARGE_OVERRUN
+                    self.play("charge")
+                else:  # hooked on or falling: nothing to run down
+                    self._recover()
+        elif self.state == CHARGING:
+            self._run(dt, player)
         elif self.state in (STRIKING, SHAKING) and self.anim_time >= ANIM_SECONDS[self.attack]:
             self._recover()
         # Events of whatever animation is playing; a new animation starts its phase from 0.
         self._events(before if self.anim == anim else 0, self.phase(), player)
 
+    def _choose(self, player):
+        """Pick the attack by distance: stomp up close, kick or sweep further out, charge from afar."""
+        d = self._distance(player)
+        if d > ATTACK_RANGE:
+            self.state, self.attack = PAWING, "paw"
+        else:
+            self.state = STRIKING
+            self.attack = "rear_stomp" if d <= STOMP_RANGE else self.rng.choice(FAR_ATTACKS)
+        self.play(self.attack)
+
     def _recover(self):
         self.state, self.attack = STANDING, None
         self.timer = RECOVER + self.rng.uniform(*ATTACK_INTERVAL)
-        self.damage_since = 0
         self.play("idle")
 
     def _distance(self, player):
         return math.hypot(player.x - self.x, player.z - self.z)
+
+    def _turn(self, player, dt):
+        """Turn towards the PC at TURN_RATE; returns the angle still to go."""
+        diff = _wrap(math.atan2(player.x - self.x, player.z - self.z) - self.yaw)  # the rig's front is +Z
+        step = TURN_RATE * dt
+        self.yaw = _wrap(self.yaw + max(-step, min(step, diff)))
+        return diff
+
+    def _run(self, dt, player):
+        """Charge straight along the locked heading; running into the PC hurts it once."""
+        step = min(CHARGE_SPEED * dt, self.charge_left)
+        x, z = self.x + math.sin(self.yaw) * step, self.z + math.cos(self.yaw) * step
+        lo, hi = world.extent(self.scene, CHARGE_EDGE)
+        inside = lo <= x <= hi and lo <= z <= hi
+        if inside:
+            self.x, self.z = x, z
+            self.y = world.terrain_height(self.scene, x, z)
+            self.charge_left -= step
+            self._cache = None
+        if not self.charge_hit:
+            fx = self.x + math.sin(self.yaw) * CHARGE_HIT_AHEAD
+            fz = self.z + math.cos(self.yaw) * CHARGE_HIT_AHEAD
+            if math.hypot(player.x - fx, player.z - fz) <= CHARGE_HIT_R:
+                self.charge_hit = player.hurt(1) or self.charge_hit
+        if self.charge_left <= 0 or not inside:
+            self._recover()
 
     def _events(self, before, now, player):
         """Fire the animation's events whose phase was crossed this frame (api.md §5.1)."""
@@ -182,8 +238,9 @@ class Boss:
                     player.hurt(event.get("dmg", 1))
             elif kind == "shockwave":
                 bones, _ = self.poses()
-                p = rig.transform(bones[event.get("bone_index", 0)], (0, 0, 0))  # under the root
-                self.waves.append([p[0], p[2], 0.0, event.get("dmg", 1), event.get("speed", 12.0)])
+                x, _, z = rig.transform(bones[event["bone_index"]], (0, 0, 0))
+                self.waves.append([x, world.terrain_height(self.scene, x, z), z, 0.0, event["speed"],
+                                   event.get("dmg", 1)])
             elif kind == "throw" and player.hook in ("pulling", "hooked"):
                 dx, dz = player.x - self.x, player.z - self.z
                 dist = math.hypot(dx, dz) or 1.0
@@ -192,27 +249,18 @@ class Boss:
                 self.shake = max(self.shake, event.get("amp", 0.3))
 
     def _spread(self, dt, player):
-        """Grow the shockwaves; a ring front passing a PC riding on the ground hurts it."""
-        alive = []
+        """Grow each ring; it hurts the PC once, when it sweeps past the PC's feet on the ground."""
         for wave in self.waves:
-            x, z, r, damage, speed = wave
-            grown = min(SHOCKWAVE_MAX, r + speed * dt)
-            d = math.hypot(player.x - x, player.z - z)
-            if player.mounted and r < d <= grown:
+            x, _, z, before, speed, damage = wave
+            wave[3] = min(SHOCKWAVE_RADIUS, before + speed * dt)
+            if player.mounted and before < math.hypot(player.x - x, player.z - z) <= wave[3]:
                 player.hurt(damage)
-            wave[2] = grown
-            if grown < SHOCKWAVE_MAX:
-                alive.append(wave)
-        self.waves = alive
+        self.waves = [w for w in self.waves if w[3] < SHOCKWAVE_RADIUS]
 
-    def shockwave_objects(self):
-        """Dust rings, scaled to their radius and sunk so that at most ~1.2 m shows above the ground."""
-        out = []
-        for x, z, r, _, _ in self.waves:
-            radius = max(r, 0.5)
-            y = world.terrain_height(self.scene, x, z) - max(0.0, 0.35 * radius - 1.2)
-            out.append(g3d.Obj(mesh_ids.SHOCKWAVE_RING, x, y, z, scale=radius))
-        return out
+    def objects(self):
+        """The dust rings on the ground (art.md §6)."""
+        return [g3d.Obj(mesh_ids.SHOCKWAVE_RING, x, y + RING_LIFT, z, scale=max(r, 0.1) / RING_MESH_RADIUS, tint=palette.DUST)
+                for x, y, z, r, _, _ in self.waves]
 
     def jump_off_warning(self, player):
         """True while a shake is coming and the PC can still let go safely."""

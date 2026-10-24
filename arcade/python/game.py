@@ -217,5 +217,5 @@ class Game:
             hud.state, hud.msg = g3d.STATE_LOSE, MSG_DEFEATED
         else:
             hud.state, hud.msg = g3d.STATE_PAUSED, MSG_MISSING
-        objects = self.player.objects() + self.boss.shockwave_objects()
+        objects = self.boss.objects() + self.player.objects()  # rings first: MAX_OBJ cuts the tail
         return Frame(view, objects, hud, self.rigs(), self.player.hook_block(), flags)

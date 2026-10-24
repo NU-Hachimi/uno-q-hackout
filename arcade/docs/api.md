@@ -269,7 +269,7 @@ flowchart LR
 | `anims` | ≤ 16 个。**线性插值**，欧拉角单位为度。没有 track 的骨骼保持静止姿态。关键帧在 phase 上的分布见下文 |
 | `tracks` | 每根骨骼 `keys` 个三元组 `[rx, ry, rz]` |
 | `root_y` | 可选，`keys` 个数值（m），加到根骨骼 `offset` 的 y 上，用于起伏、跪地、人立 |
-| `events` | 只有玩法端使用，渲染端忽略。类型：`hit`（`bone`、`r`、`dmg`：该骨骼原点半径 `r` 内的 PC 受伤）、`shockwave`（`speed` m/s，从根骨骼正下方向外扩散）、`throw`（挂在 BOSS 上且没有脱离的 PC 被甩落，扣 `dmg`）、`cam_shake`（`amp` m）。新增类型时在这里登记 |
+| `events` | 只有玩法端使用，渲染端忽略。类型：`hit`（`bone`、`r`、`dmg`：该骨骼原点半径 `r` 内的 PC 受伤）、`shockwave`（`speed` m/s，从根骨骼正下方向外扩散）、`throw`（挂在 BOSS 上且没有脱离的 PC 被甩落，扣 `dmg`）、`cam_shake`（`amp` m）、`sparks`（`attach` 挂点名、`n` 颗：从该挂点迸出发光粒子，PC `execute` 使用，见 [art.md §6](art.md#6-特效)）。新增类型时在这里登记 |
 
 **姿态求值**（`rig.py` 和 `rig.cpp` 必须一致，以本节为准；本地预览工具 `arcade/tool/common.py` 的 `pose()` 按同样规则实现）：
 
