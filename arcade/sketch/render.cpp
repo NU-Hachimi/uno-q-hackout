@@ -6,6 +6,9 @@
 #include <math.h>
 #include "src/tgx/tgx.h"
 
+#include "gen/meshes.h"
+#include "hud.h"
+#include "hud_text.h"
 #include "scene.h"
 
 #ifndef RENDER_NO_CULL
@@ -20,11 +23,17 @@ namespace {
 
 using namespace tgx;
 
-constexpr Shader SHADERS = SHADER_PERSPECTIVE | SHADER_ZBUFFER | SHADER_GOURAUD | SHADER_NOTEXTURE;
+constexpr Shader SHADERS = SHADER_PERSPECTIVE | SHADER_ZBUFFER | SHADER_GOURAUD | SHADER_FLAT | SHADER_NOTEXTURE;
 constexpr float NEAR_PLANE = 0.5f;
 constexpr float SKY_SPAN = 0.55f;  // rad above the horizon where the sky reaches skyTop
 constexpr int FOG_STEPS = 16;
 constexpr int MAX_VERTS = scene::MAX_N * scene::MAX_N;
+
+struct Camera {
+  float x, y, z;     // m
+  float yaw, pitch;  // rad; yaw 0 faces +Z, pitch > 0 looks up
+  float fovX;        // rad, horizontal
+};
 
 Renderer3D<RGB565, SHADERS, uint16_t> renderer;
 alignas(4) RGB565 tileBuf[W * TILE_H];
@@ -39,6 +48,18 @@ uint32_t (*clockUs)() = nullptr;
 Profile profile;
 uint32_t skyPattern[H][2];  // per row: 4 dithered pixels packed as two words, repeated across
 int quadDraws = 0;
+
+static_assert(sizeof(fVec3) == 3 * sizeof(float), "gen/meshes.h stores packed xyz floats");
+
+// Objects of the current frame, transformed once and drawn in every tile they overlap.
+struct ObjectDraw {
+  const gen::Mesh* mesh;
+  fMat4 model;
+  float rowLo, rowHi;  // viewport rows covered by the bounding sphere
+  uint8_t tint;
+};
+ObjectDraw objects[g3d::MAX_OBJ];
+int objectCount = 0;
 
 RGBf toRGBf(uint16_t c) {
   return RGBf(((c >> 11) & 31) / 31.0f, ((c >> 5) & 63) / 63.0f, (c & 31) / 31.0f);
@@ -94,7 +115,8 @@ void bakeFog() {
   }
 }
 
-void prepareFrame(const Camera& cam, fMat4& projView) {
+// Sets the camera; returns the vertical focal length in viewport pixels.
+float prepareFrame(const Camera& cam, fMat4& projView) {
   const scene::Params& p = scene::params;
   const float aspect = float(W) / H;
   const float fovY = 2 * atanf(tanf(cam.fovX / 2) / aspect);
@@ -125,6 +147,7 @@ void prepareFrame(const Camera& cam, fMat4& projView) {
     skyPattern[y][0] = px[0] | (uint32_t(px[1]) << 16);  // little-endian: first pixel in the low half
     skyPattern[y][1] = px[2] | (uint32_t(px[3]) << 16);
   }
+  return focal;
 }
 
 }  // namespace
@@ -135,25 +158,87 @@ void begin() {
   renderer.setZbuffer(zbuf);
   renderer.setCulling(0);
   renderer.setShaders(SHADER_GOURAUD);
-  // Ambient-only white light so baked vertex colours pass through unchanged.
-  renderer.setLight(fVec3(0, -1, 0), RGBf(1, 1, 1), RGBf(0, 0, 0), RGBf(0, 0, 0));
-  renderer.setMaterial(RGBf(1, 1, 1), 1.0f, 0.0f, 0.0f, 1);
-  fMat4 identity;
-  identity.setIdentity();
-  renderer.setModelMatrix(identity);
+  // Light travels away from the sun; terrain zeroes the diffuse term so its baked colours pass through.
+  const scene::Params& p = scene::params;
+  const fVec3 sun(cosf(p.lightPitch) * sinf(p.lightYaw), sinf(p.lightPitch), cosf(p.lightPitch) * cosf(p.lightYaw));
+  renderer.setLight(-sun, RGBf(1, 1, 1), RGBf(1, 1, 1), RGBf(0, 0, 0));
   bakeTerrain();
   bakeFog();
 }
 
 inline uint32_t now() { return clockUs ? clockUs() : 0; }
 
-void frame(const Camera& cam, PushTile push) {
+namespace {
+
+void prepareObjects(const g3d::Frame& f, const fMat4& projView, float focal) {
+  objectCount = 0;
+  for (int i = 0; i < f.nObj; ++i) {
+    const g3d::Object& o = f.obj[i];
+    if (o.mesh >= gen::MESH_COUNT || !gen::MESHES[o.mesh].nTris) continue;  // 0xFF and unknown ids
+    ObjectDraw& d = objects[objectCount];
+    d.mesh = &gen::MESHES[o.mesh];
+    d.tint = o.tint < 32 ? o.tint : 0;
+    const float radius = d.mesh->radius * o.scale;
+    const fVec4 clip = projView.mult1(fVec3(o.x, o.y, o.z));
+    if (clip.w < -radius || clip.w - radius > scene::params.fogFar) continue;  // behind or beyond the far plane
+    if (clip.w > radius) {
+      const float row = (1 - clip.y / clip.w) * (H / 2), reach = radius * focal / clip.w + 2;
+      d.rowLo = row - reach;
+      d.rowHi = row + reach;
+    } else {
+      d.rowLo = -1e9f;  // straddles the eye plane: draw in every tile
+      d.rowHi = 1e9f;
+    }
+    // T(pos) * Ry(yaw) * Rx(pitch) * S(scale); TGX mult* pre-multiplies.
+    d.model.setScale(o.scale, o.scale, o.scale);
+    d.model.multRotate(o.pitch * (180 / float(M_PI)), 1, 0, 0);
+    d.model.multRotate(o.yaw * (180 / float(M_PI)), 0, 1, 0);
+    d.model.multTranslate(o.x, o.y, o.z);
+    ++objectCount;
+  }
+}
+
+void drawObjects(int top) {
+  bool started = false;
+  for (int i = 0; i < objectCount; ++i) {
+    const ObjectDraw& d = objects[i];
+    if (d.rowHi < top || d.rowLo > top + TILE_H) continue;
+    if (!started) {
+      renderer.setShaders(SHADER_FLAT);
+      renderer.setCulling(1);  // OBJ front faces are counter-clockwise (art.md §8)
+      renderer.setMaterial(RGBf(1, 1, 1), 0.5f, 0.65f, 0.0f, 1);
+      started = true;
+    }
+    renderer.setModelMatrix(d.model);
+    const fVec3* verts = reinterpret_cast<const fVec3*>(d.mesh->verts);
+    uint16_t first = 0;
+    for (int g = 0; g < d.mesh->nGroups; ++g) {
+      const uint16_t end = d.mesh->groupEnd[g];
+      renderer.setMaterialColor(toRGBf(scene::palette[d.tint ? d.tint : d.mesh->groupColor[g]]));
+      renderer.drawTriangles(end - first, d.mesh->tris + 3 * first, verts);
+      first = end;
+    }
+  }
+  if (started) {
+    fMat4 identity;
+    identity.setIdentity();
+    renderer.setModelMatrix(identity);
+    renderer.setShaders(SHADER_GOURAUD);
+    renderer.setCulling(0);
+  }
+}
+
+}  // namespace
+
+void frame(const g3d::Frame& f, PushTile push) {
   const scene::Params& p = scene::params;
   const int n = p.terrainN;
   profile = Profile{};
   uint32_t t0 = now();
+  const Camera cam{f.camX, f.camY, f.camZ, f.camYaw, f.camPitch, f.fovX};
   fMat4 projView;
-  prepareFrame(cam, projView);
+  const float focal = prepareFrame(cam, projView);
+  prepareObjects(f, projView, focal);
 
   for (int k = 0; k < n * n; ++k) {
     const fVec4 clip = projView.mult1(verts[k]);
@@ -163,6 +248,7 @@ void frame(const Camera& cam, PushTile push) {
 
   quadDraws = 0;
   profile.setupUs = now() - t0;
+  const bool fog = !RENDER_NO_FOG && !(f.flags & g3d::FLAG_NO_FOG);
   uint16_t* pixels = reinterpret_cast<uint16_t*>(tileBuf);
   for (int tile = 0; tile < TILES; ++tile) {
     const int top = tile * TILE_H;
@@ -181,6 +267,7 @@ void frame(const Camera& cam, PushTile push) {
     uint32_t t1 = now();
     profile.skyUs += t1 - t0;
 
+    renderer.setMaterial(RGBf(1, 1, 1), 1.0f, 0.0f, 0.0f, 1);
     for (int j = 0; j + 1 < n; ++j) {
       for (int i = 0; i + 1 < n; ++i) {
         const int a = j * n + i, b = a + 1, c = a + n, d = c + 1;
@@ -195,16 +282,26 @@ void frame(const Camera& cam, PushTile push) {
         ++quadDraws;
       }
     }
-
     uint32_t t2 = now();
     profile.rasterUs += t2 - t1;
-    for (int i = 0; i < W * TILE_H; ++i) {
-      const uint16_t z = zbuf[i];
-      if (!z || RENDER_NO_FOG) continue;  // sky
-      const uint32_t a = fogAlpha[z >> 4];
-      if (a) pixels[i] = blend565(pixels[i], p.fogColor, a);
+    drawObjects(top);
+    uint32_t t3 = now();
+    profile.objectUs += t3 - t2;
+
+    if (fog) {
+      for (int i = 0; i < W * TILE_H; ++i) {
+        const uint16_t z = zbuf[i];
+        if (!z) continue;  // sky
+        const uint32_t a = fogAlpha[z >> 4];
+        if (a) pixels[i] = blend565(pixels[i], p.fogColor, a);
+      }
     }
-    profile.fogUs += now() - t2;
+    if (f.flags & g3d::FLAG_HURT) {
+      const uint16_t hurt = gen::PALETTE[gen::PAL_HURT];
+      for (int i = 0; i < W * TILE_H; ++i) pixels[i] = blend565(pixels[i], hurt, 8);
+    }
+    hud::drawTile(pixels, W, TILE_H, top, f);
+    profile.fogUs += now() - t3;
     push(tile, pixels);
   }
 }
@@ -213,17 +310,22 @@ int lastQuadDraws() { return quadDraws; }
 void setClock(uint32_t (*micros)()) { clockUs = micros; }
 const Profile& lastProfile() { return profile; }
 
-Camera demoCamera(float seconds) {
+g3d::Frame demoFrame(float seconds) {
+  g3d::Frame f = {};
   const float angle = seconds * 2 * float(M_PI) / 40;
-  const float radius = 22;
-  Camera cam;
-  cam.x = radius * sinf(angle);
-  cam.z = radius * cosf(angle);
-  cam.y = scene::terrainHeight(cam.x, cam.z) + 3.5f;
-  cam.yaw = angle + float(M_PI);  // face the arena centre
-  cam.pitch = -0.12f;
-  cam.fovX = 75 * float(M_PI) / 180;
-  return cam;
+  const float radius = 7;
+  const float ground = scene::terrainHeight(0, 0);
+  f.camX = radius * sinf(angle);
+  f.camZ = radius * cosf(angle);
+  f.camY = scene::terrainHeight(f.camX, f.camZ) + 2.2f;
+  f.camYaw = angle + float(M_PI);  // face the arena centre
+  f.camPitch = atan2f(ground + 1.2f - f.camY, radius);
+  f.fovX = 75 * float(M_PI) / 180;
+  f.state = g3d::READY;
+  f.msg = hud::MSG_WAITING;
+  f.nObj = 1;
+  f.obj[0] = g3d::Object{0, 0, 0, ground, 0, angle * 0.5f, 0, 1};  // the PC turning slowly
+  return f;
 }
 
 }  // namespace render

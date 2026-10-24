@@ -2883,6 +2883,9 @@ namespace tgx
         /** used by _discard() for testing a point position against the frustum planes */
         TGX_INLINE inline void _clip(int & fl, const fVec4 & P, float bx, float Bx, float by, float By)
             {
+            // Vendored patch: behind the eye the z-divide flips x and y, so only the near plane
+            // test is meaningful. Without this, large triangles under the camera were discarded.
+            if (P.w <= 0) { fl &= 16; return; }
             if (P.x >= bx) { fl &= (~(1)); }
             if (P.x <= Bx) { fl &= (~(2)); }
             if (P.y >= by) { fl &= (~(4)); }
