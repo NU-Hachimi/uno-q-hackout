@@ -47,7 +47,7 @@ make logs      # follow Python stdout/errors on the board
 make monitor   # MCU serial monitor
 make stop      # stop the terminal-managed app
 make build     # local MCU-only compile: arduino-cli compile --fqbn arduino:zephyr:unoq --profile default
-make package   # zip/uno-q-arcade.zip for App Lab import (a tracked file: `git restore` it after `make flash`)
+make package   # zip/uno-q-arcade.zip for App Lab import (git-ignored, never commit it)
 make devices   # adb devices -l
 ```
 

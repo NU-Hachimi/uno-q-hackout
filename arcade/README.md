@@ -30,7 +30,7 @@ flowchart LR
 
 For a terminal workflow, use [`make flash` and `make monitor`](#terminal-commands) below, then continue with the control preview here.
 
-The App Lab application is the **`arcade/` folder**. The import ZIP is in [`zip/uno-q-arcade.zip`](zip/uno-q-arcade.zip), inside the visible `zip/` folder at the root of this track. To rebuild it after editing the source, open a terminal in `arcade/` and run this with GNU Make and `zip` installed:
+The App Lab application is the **`arcade/` folder**. The import ZIP is not in git; build it as `zip/uno-q-arcade.zip` at the root of this track, and rebuild it after editing the source. Open a terminal in `arcade/` and run this with GNU Make and `zip` installed:
 
 ```sh
 make package
@@ -211,7 +211,7 @@ After editing local files, run `make flash` again. It replaces those source path
 | `make monitor` | Open the MCU serial monitor |
 | `make logs` | Follow Python output, including `print()` and errors |
 | `make stop` | Stop this track's terminal-managed app |
-| `make package` | Rebuild [`zip/uno-q-arcade.zip`](zip/uno-q-arcade.zip) for App Lab import |
+| `make package` | Build `zip/uno-q-arcade.zip` (not in git) for App Lab import |
 | `make build` | Compile only the MCU sketch locally with [Arduino CLI](https://arduino.github.io/arduino-cli/) |
 | `make clean` | Remove this track's local ZIP and sketch build |
 
