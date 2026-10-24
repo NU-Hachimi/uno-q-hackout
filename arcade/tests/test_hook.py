@@ -118,6 +118,7 @@ def raw(pressed=0):
 def test_breaking_the_weak_point_wins_and_a_restarts():
     game = Game(world.make_scene(1), seed=1)
     game.step(raw(g3d.BTN_A), DT)
+    game.step(raw(g3d.BTN_A), DT)  # skip the intro
     boss = game.boss
     for slot in boss.parts:
         boss.damage(slot, 99)
@@ -131,6 +132,7 @@ def test_breaking_the_weak_point_wins_and_a_restarts():
 def test_losing_all_health_loses():
     game = Game(world.make_scene(1), seed=1)
     game.step(raw(g3d.BTN_A), DT)
+    game.step(raw(g3d.BTN_A), DT)  # skip the intro
     game.player.hp = 0
     frame = game.step(raw(), DT)
     assert game.state == LOSE and frame.hud.msg == 14

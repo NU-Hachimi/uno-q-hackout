@@ -31,12 +31,12 @@ static const float moose_a2_shin_fr[] = {0.0000f, 0.0000f, 0.0000f, 70.0000f, 0.
 static const float moose_a2_root_y[] = {0.0000f, 0.3000f, 0.5000f, -0.2000f, 0.0000f, 0.0000f};
 static const float* const moose_a2_tracks[] = {moose_a2_root, moose_a2_neck, nullptr, moose_a2_leg_fl, nullptr, moose_a2_leg_fr, moose_a2_shin_fr, nullptr, nullptr, nullptr, nullptr};
 
-static const float moose_a3_root[] = {0.0000f, 0.0000f, 0.0000f, 0.0000f, 8.0000f, 0.0000f, 0.0000f, 12.0000f, -3.0000f, 0.0000f, -12.0000f, 3.0000f, 0.0000f, -6.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};
-static const float moose_a3_neck[] = {0.0000f, 0.0000f, 0.0000f, -8.0000f, 35.0000f, 0.0000f, -12.0000f, 48.0000f, 0.0000f, 6.0000f, -42.0000f, 0.0000f, 2.0000f, -30.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};
-static const float moose_a3_head[] = {0.0000f, 0.0000f, 0.0000f, 0.0000f, 12.0000f, -18.0000f, 0.0000f, 18.0000f, -22.0000f, 8.0000f, -18.0000f, 18.0000f, 0.0000f, -10.0000f, 6.0000f, 0.0000f, 0.0000f, 0.0000f};
+static const float moose_a3_root[] = {0.0000f, 0.0000f, 0.0000f, 7.2000f, 8.0000f, 0.0000f, 12.0000f, 12.0000f, -3.0000f, 12.0000f, -12.0000f, 3.0000f, 4.8000f, -6.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};
+static const float moose_a3_neck[] = {0.0000f, 0.0000f, 0.0000f, 36.0000f, 35.0000f, 0.0000f, 60.0000f, 48.0000f, 0.0000f, 60.0000f, -42.0000f, 0.0000f, 30.0000f, -30.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};
+static const float moose_a3_head[] = {0.0000f, 0.0000f, 0.0000f, 10.0000f, 12.0000f, -18.0000f, 18.0000f, 18.0000f, -22.0000f, 18.0000f, -18.0000f, 18.0000f, 8.0000f, -10.0000f, 6.0000f, 0.0000f, 0.0000f, 0.0000f};
 static const float moose_a3_leg_fl[] = {0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 6.0000f, 0.0000f, 0.0000f, 8.0000f, 0.0000f, 0.0000f, -6.0000f, 0.0000f, 0.0000f, -3.0000f, 0.0000f, 0.0000f, 0.0000f};
 static const float moose_a3_leg_fr[] = {0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 6.0000f, 0.0000f, 0.0000f, 8.0000f, 0.0000f, 0.0000f, -6.0000f, 0.0000f, 0.0000f, -3.0000f, 0.0000f, 0.0000f, 0.0000f};
-static const float moose_a3_root_y[] = {0.0000f, -0.2000f, -0.3000f, -0.2000f, 0.0000f, 0.0000f};
+static const float moose_a3_root_y[] = {0.0000f, -0.5000f, -1.0000f, -1.0000f, -0.4000f, 0.0000f};
 static const float* const moose_a3_tracks[] = {moose_a3_root, moose_a3_neck, moose_a3_head, moose_a3_leg_fl, nullptr, moose_a3_leg_fr, nullptr, nullptr, nullptr, nullptr, nullptr};
 
 static const float moose_a4_root[] = {0.0000f, 0.0000f, 0.0000f, -12.0000f, 0.0000f, 0.0000f, -25.0000f, 0.0000f, 0.0000f, -28.0000f, 0.0000f, 0.0000f, 6.0000f, 0.0000f, 0.0000f, 2.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};

@@ -108,6 +108,7 @@ class Boss:
         self.broken = []   # (slot, world position, tint) broken since the game last read it, for debris
         self.shake = 0.0   # camera shake amplitude (m) from the latest event, read and cleared by the game
         self.waves = []    # spreading shockwaves: [x, y, z, radius, speed, damage]
+        self.fade = 0.0    # 0..1 extra blend into the fog (1 = not drawn), for the intro
         self._cache = None
 
     # ---- animation -----------------------------------------------------------------------
@@ -159,6 +160,12 @@ class Boss:
             if self.anim_time >= ANIM_SECONDS[self.attack]:
                 self.state, self.timer, self.attack = STANDING, RECOVER + self.rng.uniform(*ATTACK_INTERVAL), None
                 self.play("idle")
+
+    def idle(self, dt):
+        """Breathe in place without attacking (Ready and the intro)."""
+        self.play("idle")
+        self.anim_time += dt
+        self._cache = None
 
     def _distance(self, player):
         return math.hypot(player.x - self.x, player.z - self.z)
@@ -296,4 +303,4 @@ class Boss:
     def rig_block(self):
         return g3d.Rig(rig_id=RIG_ID, anim=self.anim, phase=self.phase(),
                        hit_slot=self.hit_slot if self.hit_timer > 0 else 0xFF,
-                       x=self.x, y=self.y, z=self.z, yaw=self.yaw, part_alive=self.alive)
+                       x=self.x, y=self.y, z=self.z, yaw=self.yaw, part_alive=self.alive, fade=self.fade)

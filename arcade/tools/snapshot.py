@@ -52,7 +52,14 @@ def main():
         seq += 1
 
     run("1_ready", [raw()])
-    run("2_fight_hint", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A), raw()])
+    # The intro: A, then the PC gallops in on its own; the boss looms out of the fog
+    run("2a_intro_fog", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A)] + [raw()] * 50)
+    run("2b_intro_near", [raw()] * 60)
+    intro = 0
+    while game.state == "intro" and intro < 400:
+        game.step(raw(), DT)
+        intro += 1
+    run("2_fight_hint", [raw()])
     # Walk forward and right for 1.5 s, then hold B while turning a little with tilt.
     walk = [raw(jx=40, jy=110)] * 30
     tilt_right = (300, 0, 950)
@@ -97,7 +104,8 @@ def main():
     # The day cycle at 8 points (holds and blends) on a fresh round; NAME.sky next to NAME.frame is a
     # g3d_scene_sky payload that render_preview.sh applies after the scene.
     game = Game(scene, seed=7)
-    run("15_ride", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A)] + [raw(jx=-30, jy=100)] * 20 + [raw(held=g3d.BTN_B)] * 3)
+    skip_intro = [raw(pressed=g3d.BTN_A, held=g3d.BTN_A), raw(), raw(pressed=g3d.BTN_A, held=g3d.BTN_A)]
+    run("15_ride", skip_intro + [raw(jx=-30, jy=100)] * 20 + [raw(held=g3d.BTN_B)] * 3)
     period = world.DAY_HOLD + world.DAY_BLEND
     for k in range(8):
         t = (k // 2) * period + (world.DAY_HOLD / 2 if k % 2 == 0 else world.DAY_HOLD + world.DAY_BLEND / 2)
@@ -116,7 +124,8 @@ def main():
     run("17_stomp_ring", [raw()])
     # Mid-charge: the PC 30 m away gets run at, head down
     game = Game(scene, seed=7)
-    game.step(raw(pressed=g3d.BTN_A, held=g3d.BTN_A), DT)  # Ready -> Fight
+    for r in skip_intro:  # Ready -> Intro -> Fight
+        game.step(r, DT)
     boss = game.boss
     game.player.x, game.player.z = boss.x, boss.z - 30
     game.player.yaw = game.camera.yaw = 0.0
