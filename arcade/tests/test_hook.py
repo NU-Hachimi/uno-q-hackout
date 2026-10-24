@@ -86,21 +86,19 @@ def test_a_miss_comes_back():
     assert pc.hook is None and not pc.airborne
 
 
-def test_hooked_shots_double_and_reach_the_weak_point():
+def test_hooked_shots_do_double_damage():
     scene, boss = setup()
-    for slot in boss.parts:
-        boss.damage(slot, 99)
-    assert boss.weak_exposed()
+    back = next(s for s in boss.parts if s not in boss.legs)
     pc = Player(scene)
     pc.hook = HOOKED
-    weak = next(c for c in boss.colliders() if c.slot == boss.weak)
-    eye = weak.centre()[0], weak.centre()[1] + 4, weak.centre()[2] + 1
-    d = tuple((b - a) / math.dist(eye, weak.centre()) for a, b in zip(eye, weak.centre()))
+    part = next(c for c in boss.colliders() if c.slot == back)
+    eye = part.centre()[0], part.centre()[1] + 4, part.centre()[2] + 1
+    d = tuple((b - a) / math.dist(eye, part.centre()) for a, b in zip(eye, part.centre()))
+    before = boss.hp[back]
     pc._shoot(aim.Aim(eye, d), boss.colliders())
     for _ in range(10):
         pc._advance(DT, boss)
-    assert boss.hp[boss.weak] == 5 - 2
-
+    assert boss.hp[back] == before - 2
 
 def test_cannot_be_hurt_while_riding_the_hook():
     scene, boss = setup()
@@ -115,18 +113,30 @@ def raw(pressed=0):
     return g3d.RawInput(0, 7, 0, pressed, 0, 0, 0, 0, 1000, 0, 0, 0, 0)
 
 
-def test_breaking_the_weak_point_wins_and_a_restarts():
+def test_finisher_prompts_then_b_plays_it_and_wins():
+    from finisher import DIE, SHATTER, TAIL
+    from game import EXECUTE, MSG_FINISH
     game = Game(world.make_scene(1), seed=1)
     game.step(raw(g3d.BTN_A), DT)
-    boss = game.boss
+    boss, pc = game.boss, game.player
     for slot in boss.parts:
         boss.damage(slot, 99)
-    boss.damage(boss.weak, 99, hooked=True)
+    pc.hook = HOOKED
+    pc.x, pc.y, pc.z = boss.x, boss.y + 8.0, boss.z - 2.0
+    boss.timer = 99.0
     frame = game.step(raw(), DT)
-    assert game.state == WIN and frame.hud.state == g3d.STATE_WIN and frame.hud.msg == 13
+    assert frame.hud.msg == MSG_FINISH
+    shots = pc.shots
+    frame = game.step(raw(g3d.BTN_B), DT)
+    assert game.state == EXECUTE and pc.shots == shots  # B finished instead of shooting
+    frame = game.step(raw(), DT)
+    assert frame.flags & g3d.FLAG_NO_HUD
+    for _ in range(int((SHATTER + DIE + TAIL) / DT) + 2):
+        frame = game.step(raw(), DT)
+    assert game.state == WIN and frame.hud.msg == 13 and boss.defeated()
+    assert boss.fade == 1.0  # sank into the fog
     game.step(raw(g3d.BTN_A), DT)
     assert game.state == READY
-
 
 def test_losing_all_health_loses():
     game = Game(world.make_scene(1), seed=1)

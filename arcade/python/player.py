@@ -30,7 +30,7 @@ SHOT_RANGE = 80.0       # m
 TRACER_SPEED = 120.0    # m/s; the hit lands when the streak arrives
 MAX_TRACERS = 3
 GROUND_STEP = 1.0       # m between terrain samples along a shot
-MAX_SPARKS = 6
+MAX_SPARKS = 4          # objects per frame: hook 1 + tracers 3 + sparks 4 + boss shockwave 1 = 9
 HIT_SPARK_LIFE = 0.25   # s
 DEBRIS_LIFE = 0.6       # s
 DEBRIS_COUNT = 6
@@ -120,8 +120,8 @@ class Player:
         self.hook_to = (0.0, 0.0, 0.0)    # world point the hook flies to
         self.hook_head = (0.0, 0.0, 0.0)  # where the hook head is drawn while flying
         self.hook_time = 0.0
-        self.vy = 0.0
-        self.airborne = False  # falling after letting go
+        self.vx = self.vy = self.vz = 0.0
+        self.airborne = False  # falling after letting go or being thrown off
         self.invulnerable = 0.0
         self.hurt_flash = 0.0
         self.shots = 0  # fired so far this round
@@ -133,6 +133,7 @@ class Player:
         self.standing = True     # stick released: the horse plays `stand`
         self.stand_time = 0.0
         self.since_shot = self.since_hit = self.since_land = 10.0
+        self.anim_override = None  # (anim, phase) for the rider while finisher.py runs the finisher
         self.loose = None        # (x, y, z, yaw, speed) of the riderless horse as the rider left it
         self.loose_time = 0.0
 
@@ -152,6 +153,8 @@ class Player:
         return HORSE_ANIM["gallop"], int(self.gait) & 255
 
     def _rider_anim(self):
+        if self.anim_override:
+            return self.anim_override
         shooting = self.since_shot < SHOOT_ANIM
         shot = int(255 * self.since_shot / SHOOT_ANIM)
         if self.hook == PULLING:
@@ -235,11 +238,15 @@ class Player:
         self.y = world.terrain_height(self.scene, self.x, self.z)
 
     def _fall(self, dt):
+        lo, hi = world.extent(self.scene, EDGE_MARGIN)
+        self.x = min(hi, max(lo, self.x + self.vx * dt))
+        self.z = min(hi, max(lo, self.z + self.vz * dt))
         self.vy -= GRAVITY * dt
         self.y += self.vy * dt
         ground = world.terrain_height(self.scene, self.x, self.z)
         if self.y <= ground:
-            self.y, self.vy, self.airborne = ground, 0.0, False
+            self.y, self.airborne = ground, False
+            self.vx = self.vy = self.vz = 0.0
             self.since_land, self.loose = 0.0, None  # straight into the saddle
 
     # ---- hook -------------------------------------------------------------------------------
@@ -247,7 +254,8 @@ class Player:
         if self.hook in (PULLING, HOOKED):  # let go and drop; from here the PC point is the hooves again
             ox, oy, oz = self._rider_origin()
             self.x, self.y, self.z = ox, oy - MOUNT_DROP, oz
-            self.hook, self.airborne, self.vy, self.loose_time = None, True, 0.0, 0.0
+            self.hook, self.airborne, self.loose_time = None, True, 0.0
+            self.vx = self.vy = self.vz = 0.0
             return
         if self.hook is not None or self.airborne:
             return
@@ -313,6 +321,19 @@ class Player:
             return g3d.Hook()
         return g3d.Hook(flags=1 | (2 if self.hook == HOOKED else 0), x=self.hook_head[0], y=self.hook_head[1],
                         z=self.hook_head[2])
+
+    def thrown(self, away, damage, speed=7.0, up=5.0):
+        """The boss shook the PC off: it flies away from the boss (horizontal unit `away`) and falls back
+        into the saddle like after letting go (art.md §2), with a hit that ignores hooked immunity."""
+        if self.hook not in (PULLING, HOOKED):
+            return False
+        ox, oy, oz = self._rider_origin()
+        self.x, self.y, self.z = ox, oy - MOUNT_DROP, oz
+        self.hook, self.airborne, self.loose_time = None, True, 0.0
+        self.vx, self.vy, self.vz = away[0] * speed, up, away[1] * speed
+        self.hp = max(0, self.hp - damage)
+        self.invulnerable, self.hurt_flash, self.since_hit = INVULNERABLE, HURT_FLASH, 0.0
+        return True
 
     def hurt(self, damage):
         """A boss attack connected. Ignored while invulnerable or riding the hook."""
