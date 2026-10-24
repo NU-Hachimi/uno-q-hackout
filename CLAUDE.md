@@ -31,7 +31,9 @@ Desktop Python is the repo-root `.venv`. It was created from miniforge's Python 
 
 `arduino-cli` is in `~/.local/bin`, so `make build` works locally. The first build downloads the core and libraries from the `sketch.yaml` profile.
 
-Much of the layout described in `api.md` and `workflow.md` (`tools/`, `tests/`, `sketch/gen/`, `python/gen/`, `g3d.py`, etc.) is **planned and not built yet**. Check what actually exists before assuming it.
+Parts of the layout in `api.md` and `workflow.md` are still planned: `tools/rig_build.py`, `tools/sim.py`, `rig.*`, `collide.py`, `boss.py` and the golden rig data don't exist yet. Check what actually exists before assuming it.
+
+**Controls follow the 操作表 in `docs/plan.md`** (settled 2026-10-24): stick moves, tilt turns the view (rate control), A opens the menu (Continue / Restart / Recalibrate) and confirms, B shoots, C is the hook. There is no dodge or jump. Don't bring back stick-press dodge, hold-C lock-on or tilt-only aiming.
 
 The root README holds the scoring rubrics; the arcade rubric is the target. The track READMEs and PREWORK.md are participant-facing docs. Keep them in sync when you change commands or defaults they quote.
 
@@ -45,7 +47,7 @@ make logs      # follow Python stdout/errors on the board
 make monitor   # MCU serial monitor
 make stop      # stop the terminal-managed app
 make build     # local MCU-only compile: arduino-cli compile --fqbn arduino:zephyr:unoq --profile default
-make package   # build/uno-q-arcade.zip for App Lab import
+make package   # zip/uno-q-arcade.zip for App Lab import (a tracked file: `git restore` it after `make flash`)
 make devices   # adb devices -l
 ```
 
@@ -57,30 +59,36 @@ Add `SERIAL=<adb serial>` when more than one device is connected. `make flash` d
 
 Other tools:
 
-- **Tests:** none exist yet. The plan is `pytest tests/` on the desktop, run against golden protocol and rig data.
+- **Tests:** `.venv/bin/python -m pytest arcade/tests` (protocol, terrain, game state machine). `tests/conftest.py` puts `python/` on `sys.path`, as on the board.
+- **Generated code:** `python3 tools/mesh_build.py` turns `assets/` into `sketch/gen/{meshes,palette}.h` and `python/gen/{mesh_ids,palette}.py`; `--check` exits 1 if they are stale. Rerun it after any asset change.
 - **Wi-Fi:** `tools/board-wifi.sh` joins the board to NUwave or eduroam over adb. `--forget` removes the saved login.
 
 **Core version:** the boards run `arduino:zephyr 1.0.0`, but the starter README pins 0.55.2. `arcade/sketch/sketch.yaml` decides which version gets used. All library versions there are pinned.
 
-## Current arcade starter (what exists)
+## How the arcade app works now
 
 ### Bridge RPC is the contract
 
-The sketch registers handlers with `Bridge.provide_safe("name", fn)` in `setup()`. Python calls them with `Bridge.call("name", *args)`. Names, argument order, and argument types must match on both sides, so change the provider and its callers together.
+The sketch registers handlers in `setup()`; Python calls them with `Bridge.call("name", *args, timeout=s)`. Names, argument order and types must match on both sides, so change the provider and its callers together.
+
+- `g3d_*` methods (`sketch/rpc.cpp`) use `Bridge.provide`: they run on the Bridge thread, validate, and copy into a buffer under a `k_mutex`. The render loop takes the newest frame.
+- `arcade_read_inputs` / `arcade_video_*` (RetroArch) still use `provide_safe`, which only runs between `loop()` iterations and at the mid-frame `safeUpdate()`.
+- `MsgPack::bin_t<uint8_t>` works both as an argument and as a return value.
 
 The link runs at **115200 baud**, roughly 11.5 KB/s, and the sketch accepts at most **256 B per request**. Never stream pixels from the MPU. All rendering happens on the MCU.
 
-### Preview path
+### Game path
 
-1. `python/main.py` calls `arcade_read_inputs` and gets a JSON snapshot: `connected` and `buttons` bitmasks, raw `x`/`y`, `ax`/`ay`/`az` in mg, and `video`.
-2. `python/preview.py` `frame_values()` validates the snapshot and applies calibration.
-3. Python calls `arcade_draw_frame(...)`, and `drawFrame()` in `sketch/sketch.ino` draws it.
+1. `python/main.py` connects (`g3d_hello`, scene upload), then loops at ~20 Hz: `game.step(raw_input, dt)` → `g3d.pack_frame` → `g3d_frame`, whose reply is the next 16 B Input.
+2. Python modules: `g3d.py` (wire format, client), `world.py` (scene, `terrain_height`), `controls.py` (stick, button edges, tilt rates), `camera.py`, `player.py`, `game.py` (Ready → Fight ⇄ Menu).
+3. The MCU latches button presses between frames (Input `buttons` bit4–7), so short taps are not lost.
+4. If no frame arrives for 1.5 s, the sketch renders its own demo orbit with "WAITING FOR PYTHON".
 
-If no frame arrives for 1.5 s, the sketch shows a waiting screen.
+**Coordinates:** yaw 0 faces +Z and +Y is up, so with the view along +Z, +X is on screen **left**. Turning right lowers yaw; `camera.right(yaw) = (-cos yaw, 0, sin yaw)`. Objects are drawn as `T·Ry(yaw)·Rx(pitch)·S`, so positive object pitch tips the +Z nose down.
 
 ### Calibration
 
-Calibration lives in `python/preview.py`: `DEAD_ZONE`, `INVERT_X/Y`, `MOVEMENT_ZERO_MG`, and `MOVEMENT_DEAD_ZONE_MG`. `retroarch/controls.py` imports it via `sys.path`, so changing it affects both paths.
+`python/preview.py` keeps `DEAD_ZONE` and `INVERT_X/Y`, used by `controls.py` and `retroarch/controls.py`. Tilt uses the gravity direction relative to a neutral pose sampled on the Ready-screen A press. **Every tilt parameter lives in `python/tilt_config.py`**: axes and inversion, dead zone, full-speed angle, max rates, curve, smoothing, pitch limits, and `DEBUG_LOG`, which prints per-axis degrees to the app log. The user tunes that file by hand, so don't move these values elsewhere or override them in code.
 
 ### RetroArch path (`retroarch/`)
 
@@ -93,25 +101,37 @@ Calibration lives in `python/preview.py`: `DEAD_ZONE`, `INVERT_X/Y`, `MOVEMENT_Z
 - **Display controller:** `ARCADE_TFT_HX8357D` selects it. `1` is HX8357D (the default) and `0` is RM68140.
 - **Controls:** the Modulinos sit on Qwiic `Wire1`: Buttons `0x3E`, Joystick `0x2C`, Movement `0x6A`.
 
-## Renderer built so far (branch `render/grass-demo`)
+## Renderer (MCU)
 
-- **`G3D_DEMO` mode:** `sketch.ino` defaults to `G3D_DEMO 1`, which renders an orbiting misty meadow on the MCU. The starter's `drawFrame` and RetroArch paths are disabled while it is on.
-- **Files:** `tft8080.*` does BSRR pixel writes, `scene.*` holds the terrain parameters and heights, and `render.*` is platform-independent TGX code (sky, grass, fog, 240×32 tiles, built at `-O2` via a pragma; the core defaults to `-Os`).
-- **TGX is vendored** in `sketch/src/tgx/`; see `VENDORED.md`. Don't switch back to the registry library, which fails to compile on the Zephyr core. `.inl` files are renamed to `.inl.h` because arduino-cli doesn't copy `.inl` files.
-- **Desktop preview:** run `sh tests/cpp/render_preview.sh 0 10` from `arcade/`. It compiles `scene.cpp` and `render.cpp` with g++ and writes `build/preview/t*.png`; Read those PNGs to check the image before flashing. `-DRENDER_NO_CULL=1` and `-DRENDER_NO_FOG=1` (passed via `CXXFLAGS`) help isolate bugs.
+- **Files:**
+  - `tft8080.*` does BSRR pixel writes.
+  - `g3d_proto.*` parses frames (platform-independent).
+  - `scene.*` holds terrain, the upload staging copy and Look grading.
+  - `render.*` is platform-independent TGX code: sky, grass, objects, fog, 240×32 tiles, built at `-O2` via a pragma; the core defaults to `-Os`.
+  - `hud.*` draws text, reticle and menu into each tile.
+  - `inputs.*` reads the Modulinos under a mutex.
+  - `rpc.*` holds the Bridge handlers.
+- **Meshes** come from `sketch/gen/meshes.h`. Each mesh is grouped by palette index; each group sets `setMaterialColor` and calls `drawTriangles`, with flat shading and culling on.
+- **TGX is vendored** in `sketch/src/tgx/`; see `VENDORED.md` for the three patches. Don't switch back to the registry library, which fails to compile on the Zephyr core.
+  - `.inl` files are renamed to `.inl.h`, because arduino-cli doesn't copy `.inl` files.
+  - `_clip()` ignores x/y outcodes of vertices behind the eye; without this, big terrain triangles under the camera vanished.
+- **Desktop preview** (run from `arcade/`); Read the PNGs it writes before flashing:
+  - `sh tests/cpp/render_preview.sh 0 10` renders the demo orbit.
+  - `sh tests/cpp/render_preview.sh --snapshots` runs `tools/snapshot.py`, which drives the real Python `Game` with scripted inputs, then renders its scene upload and frames with the MCU code into `build/preview/*.png`.
+  - `-DRENDER_NO_CULL=1` and `-DRENDER_NO_FOG=1` (passed via `CXXFLAGS`) help isolate bugs.
 - **Push timing:** `tft8080.cpp` is built at `-O3`, which makes GPIO stores back to back. `TFT_WR_NOPS=3` and `TFT_WR_HOLD_NOPS=3` are the verified-safe values (about 29.5 ms per full screen). Lower values garbled the panel. Any change to the push loop needs a human to look at the screen, because the desktop preview can't catch bus timing.
-- **Board-side check:** `g3d_debug_stats` is a debug-only RPC registered with `Bridge.provide`, not `provide_safe`, so it answers even if `setup()` stalls. It returns the init stage (8 = render loop running) plus fps, `render_ms` and `push_ms`. To read it, call it through `/var/run/arduino-router.sock` from board-side Python; the board has no msgpack module, so the client needs a minimal hand-written msgpack.
+- **Board-side check:** `g3d_debug_stats` is a debug-only RPC registered with `Bridge.provide`, not `provide_safe`, so it answers even if `setup()` stalls. It returns the init stage (8 = render loop running), fps, `live` (Python frames being rendered), `seq`, `rx_fps` and per-phase timings. To read it, call it through `/var/run/arduino-router.sock` from board-side Python; the board has no msgpack module, so the client needs a minimal hand-written msgpack.
 - **Stuck sketch:** if the sketch never starts, the CPU sits idle in the kernel. You can halt it over SWD without resetting by running `/opt/openocd/bin/openocd` with `openocd_gpiod.cfg` + `reset_config none` to read PC and the fault registers. Always `resume` afterwards.
 - **Rendering conventions:**
   - Image rows grow downwards while NDC y grows upwards, so screen y = `(1 − ndc_y)·H/2`.
   - The uint16 zbuffer stores `wa/depth + wb`; 0 means empty (sky).
-  - `provide_safe` handlers only run between `loop()` iterations (and where `safeUpdate()` is called), so the render loop calls `safeUpdate()` after each tile.
+  - Idle `safeUpdate()` sleeps 1 ms, so the render loop calls it once mid-frame, not after every tile.
 
 ## Planned game architecture (`arcade/docs/api.md`)
 
 ### Who does what
 
-- The **MCU renders.** It uses TGX (`vindar/tgx`), tiled 240×16 at 240×160 with 2× upscale. It does depth fog from the z-buffer, then draws the HUD, then pushes the frame through a custom BSRR 8080 driver.
+- The **MCU renders.** It uses TGX (`vindar/tgx`), tiled 240×32 at 240×160 with 2× upscale. It does depth fog from the z-buffer, then draws the HUD, then pushes the frame through a custom BSRR 8080 driver.
 - The stock DIYables write path uses `digitalWrite` and takes seconds per frame. The custom driver must replace it.
 
 ### Game loop
@@ -149,5 +169,5 @@ Calibration lives in `python/preview.py`: `DEAD_ZONE`, `INVERT_X/Y`, `MOVEMENT_Z
 
 ### Working without the other side
 
-- **Renderer:** `G3D_DEMO=1` builds a standalone renderer demo with no Python.
-- **Gameplay:** `tools/sim.py` is a planned pygame wireframe simulator for desktop testing without a board.
+- **Renderer:** with no Python frames the sketch renders its demo orbit, so it runs standalone.
+- **Gameplay:** `tests/test_game.py` plus `render_preview.sh --snapshots` cover most changes on the desktop. `tools/sim.py` (interactive pygame simulator) is still planned.

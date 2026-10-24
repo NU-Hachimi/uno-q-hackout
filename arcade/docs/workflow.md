@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 负责 | 把 Frame 包画到 TFT 上，并采集输入 | 游戏逻辑、数据工具、协议打包 |
 | 主要风险 | 性能（推屏、TGX、LLEXT 内存） | 手感、碰撞、骨骼数据一致性 |
-| 不依赖对方时用的替身 | `G3D_DEMO=1` 演示模式 | `tools/sim.py` 桌面模拟器 |
+| 不依赖对方时用的替身 | 没有 Python 帧时自动显示的演示画面 | `tests/test_game.py` + `render_preview.sh --snapshots`；`tools/sim.py` 桌面模拟器（计划中） |
 
 模型制作不在分工范围内。在模型交付前，双方都使用 `tools/mesh_build.py --placeholder` 生成的占位模型。
 

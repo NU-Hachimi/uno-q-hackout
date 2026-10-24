@@ -47,10 +47,10 @@ flowchart LR
 
 规则：
 
-- 全部用 `Bridge.provide_safe` 注册。**处理函数只做校验和拷贝，不做渲染。**
+- **处理函数只做校验和拷贝，不做渲染。** 实现上用 `Bridge.provide` 注册（在 Bridge 线程里运行，Python 不用等渲染循环），共享数据用 `k_mutex` 保护。*（2026-10-24 改动，待 A 确认；原文为 `provide_safe`）*
 - 同时保留原有的 `arcade_read_inputs` / `arcade_video_*`，RetroArch 流程仍然可用。
 - MCU 超过 1.5 s 没收到 `g3d_frame` 时，显示 “Waiting…” 画面，但保留已加载的场景。
-- 如果实测发现 `MsgPack::bin_t` 不能作为返回值，`g3d_frame` 改为返回 `String`（Input 的 16 字节编码成 32 个十六进制字符）。Python 端在 `unpack_input` 中兼容两种格式。
+- 如果实测发现 `MsgPack::bin_t` 不能作为返回值，`g3d_frame` 改为返回 `String`（Input 的 16 字节编码成 32 个十六进制字符）。Python 端在 `unpack_input` 中兼容两种格式。**实测（2026-10-24）：`bin_t` 可以作为返回值**，Caps 的 bit0 为 1。
 
 ## 3. 二进制格式
 
@@ -166,7 +166,7 @@ flowchart LR
 
 ### 3.4 Caps（`g3d_hello` 返回）
 
-`ver u8, render_w u16, render_h u16, tile_h u8, max_obj u8, max_slots u8, n_mesh u8, n_rig u8, flags u8`。`flags` 的 bit0 表示支持返回 bin，bit1 表示支持逐像素调色（`grade_mode = 2`）。
+`ver u8, render_w u16, render_h u16, tile_h u8, max_obj u8, max_slots u8, n_mesh u8, n_rig u8, flags u8`，共 11 B。`flags` 的 bit0 表示支持返回 bin，bit1 表示支持逐像素调色（`grade_mode = 2`）。
 
 ### 3.5 Input（`g3d_frame` 返回，16 B）
 
@@ -175,16 +175,16 @@ flowchart LR
 | 0 | u8 | `ver` = 1 |
 | 1 | u8 | `seq_ack`：最近开始渲染的帧序号 |
 | 2 | u8 | `connected`：bit0 Buttons，bit1 Joystick，bit2 Movement |
-| 3 | u8 | `buttons`：bit0 A，bit1 B，bit2 C，bit3 摇杆按下 |
+| 3 | u8 | `buttons`：bit0–3 是当前按住的 A、B、C、摇杆按下；**bit4–7 是“上一次回复以来新按下过”**（同样顺序），由 MCU 在两帧之间锁存，回复后清零，快速点按不会丢 *（待 A 确认）* |
 | 4 | i8 | `jx`（原始值） |
 | 5 | i8 | `jy` |
 | 6 | i16×3 | `ax, ay, az`（mg，原始值，含重力） |
-| 12 | i8 | `gx`（°/s ÷ 4） |
-| 13 | i8 | `gy` |
+| 12 | i8 | `gx`（°/s ÷ 4），可选，未实现时为 0（视角由加速度算出） |
+| 13 | i8 | `gy`，同上 |
 | 14 | u8 | `render_ms` |
 | 15 | u8 | `push_ms` |
 
-**`msg_id` 表**（文字存在 MCU 端，`sketch/hud_text.h`）：0 无，1 “Press A to start”，2 “Break the armor”，3 “Hook on! (B)”，4 “Strike the head”，5 “Hold on!”，6 “Victory - C to restart”，7 “Defeated - C to restart”，8 “Controller missing”。新增文案时追加编号，不要改已有编号。文案**只允许 ASCII 0x20–0x7E**，用像素字体绘制（[art.md §5](art.md#5-hud-与字体)），构建时检查。
+**`msg_id` 表**（文字存在 MCU 端，`sketch/hud_text.h`）：0 无，1 “Press A to start”，2 “Break the armor”，3 “Hook on! (C)”，4 “Strike the head”，5 “Hold on!”，6 “Victory - C to restart”（被 13 取代），7 “Defeated - C to restart”（被 14 取代），8 “Controller missing”，9 菜单选中 Continue，10 菜单选中 Restart，11 菜单选中 Recalibrate（`game_state = 4` 时 HUD 画三项菜单并高亮该项），12 “Hold the console naturally, press A”，13 “Victory - A to restart”，14 “Defeated - A to restart”，15 “Stick move  Tilt look  B shoot  A menu”，16 “Waiting for Python”（仅 MCU 演示画面使用）。新增文案时追加编号，不要改已有编号。*（9–16 和 3 的按键文字为 2026-10-24 改动，跟随新的操作表，待 A 确认）*文案**只允许 ASCII 0x20–0x7E**，用像素字体绘制（[art.md §5](art.md#5-hud-与字体)），构建时检查。
 
 ## 4. 错误处理约定
 
@@ -331,7 +331,7 @@ bool takePending(FramePacket& out);             // loop() 每次取最新的一�
 - **雾**：一块渲染完后逐像素读取 z-buffer，用 16 级查找表把颜色混向 `fog_color`；超过 `fog_far` 的部分直接画成雾色。
 - **调色**：模式 1 在 `scene::commit` 里处理一次颜色，渲染时零开销。模式 2 在雾的同一个循环里接着做：查 R/G/B 三张通道表（32/64/32 项，commit 时预计算）+ 饱和度混合 + 可选 Bayer 抖动。HUD 在调色之后画，不受影响。
 - **HUD**：在每块内绘制落在该块范围里的部分，不额外推屏，也就不会闪烁。字体只用 `sketch/gen/font_*.h`，不抗锯齿。
-- **演示模式**：编译时定义 `G3D_DEMO=1`，sketch 内置一个相机绕 BOSS 转圈、循环播放全部动画的演示，不需要 Python 就能运行。
+- **演示模式**：超过 1.5 s 没收到 `g3d_frame`（或收到 `g3d_release`）时，sketch 自动渲染内置演示：相机绕场地中心转圈，画面显示 `msg_id` 16 “WAITING FOR PYTHON”，不需要 Python 就能运行。以后 BOSS 加入后改为绕 BOSS 转圈并循环播放动画。
 
 ## 7. 玩法端模块（Python，`python/`）
 
