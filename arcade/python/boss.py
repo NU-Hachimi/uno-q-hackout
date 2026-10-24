@@ -1,6 +1,7 @@
 """The boss: attack cycle, the parts fitted this round, their health and the phases (docs/plan.md BOSS).
 
-It stands still between attacks. To attack it turns slowly towards the PC, then kicks or sweeps.
+It stands still between attacks. To attack it turns slowly towards the PC, then kicks, sweeps or rears up and
+stomps; the stomp sends a dust ring across the ground that hurts the PC if it is on the ground when the ring passes.
 Breaking both leg parts makes it kneel for good (no more attacks); breaking the legs and the back
 shatters the head cover and exposes the weak point, which can only be hurt while hooked on.
 """
@@ -12,14 +13,14 @@ import collide
 import g3d
 import rig
 import world
-from gen import palette
+from gen import mesh_ids, palette
 from gen.rigs import RIGS
 
 RIG_ID = 1
 LEG_PARTS = 2                     # leg parts fitted per round, plus the back and the head
-ANIM_SECONDS = {"idle": 4.0, "walk": 2.0, "kneel": 2.5, "punch_r": 2.4, "sweep": 2.6}
+ANIM_SECONDS = {"idle": 4.0, "walk": 2.0, "kneel": 2.5, "punch_r": 2.4, "sweep": 2.6, "rear_stomp": 2.4}
 
-ATTACKS = ("punch_r", "sweep")
+ATTACKS = ("punch_r", "sweep", "rear_stomp")
 ATTACK_RANGE = 14.0               # m; it only starts an attack when the PC is this close
 ATTACK_INTERVAL = (5.0, 8.0)      # s of standing still between attacks
 TURN_RATE = math.radians(25)      # rad/s while turning to attack
@@ -29,6 +30,9 @@ RECOVER = 1.0                     # s standing still after an attack
 FLASH_SECONDS = 0.1               # hit_slot flash (two frames at 20 Hz)
 FOOT_CLEARANCE = 0.3              # m added to a shin's radius on the ground
 PC_CENTRE = 0.9                   # m above the PC's feet, for hit events
+SHOCKWAVE_RADIUS = 14.0           # m; the ring stops here, so standing farther out dodges it
+RING_MESH_RADIUS = 1.0            # m, outer radius of shockwave_ring at scale 1
+RING_LIFT = 0.2                   # m above the ground under the boss, so terrain bumps don't swallow the ring
 
 STANDING, TURNING, STRIKING, KNEELING = "standing", "turning", "striking", "kneeling"
 
@@ -91,6 +95,7 @@ class Boss:
         self.hit_slot, self.hit_timer = 0xFF, 0.0
         self.broken = []   # (slot, world position, tint) broken since the game last read it, for debris
         self.shake = 0.0   # camera shake amplitude (m) from the latest event, read and cleared by the game
+        self.waves = []    # spreading shockwaves: [x, y, z, radius, speed, damage]
         self._cache = None
 
     # ---- animation -----------------------------------------------------------------------
@@ -109,6 +114,7 @@ class Boss:
         self.anim_time += dt
         self.hit_timer = max(0.0, self.hit_timer - dt)
         self._cache = None
+        self._spread(dt, player)
         if self.state == KNEELING:
             return
         self.timer -= dt
@@ -142,8 +148,27 @@ class Boss:
                 p = rig.transform(bones[event["bone_index"]], (0, 0, 0))
                 if math.dist(p, (player.x, player.y + PC_CENTRE, player.z)) <= event["r"]:
                     player.hurt(event.get("dmg", 1))
+            elif event["type"] == "shockwave":
+                bones, _ = self.poses()
+                x, _, z = rig.transform(bones[event["bone_index"]], (0, 0, 0))
+                self.waves.append([x, world.terrain_height(self.scene, x, z), z, 0.0, event["speed"],
+                                   event.get("dmg", 1)])
             elif event["type"] == "cam_shake":
                 self.shake = max(self.shake, event.get("amp", 0.3))
+
+    def _spread(self, dt, player):
+        """Grow each ring; it hurts the PC once, when it sweeps past the PC's feet on the ground."""
+        for wave in self.waves:
+            x, _, z, before, speed, damage = wave
+            wave[3] = min(SHOCKWAVE_RADIUS, before + speed * dt)
+            if player.mounted and before < math.hypot(player.x - x, player.z - z) <= wave[3]:
+                player.hurt(damage)
+        self.waves = [w for w in self.waves if w[3] < SHOCKWAVE_RADIUS]
+
+    def objects(self):
+        """The dust rings on the ground (art.md §6)."""
+        return [g3d.Obj(mesh_ids.SHOCKWAVE_RING, x, y + RING_LIFT, z, scale=max(r, 0.1) / RING_MESH_RADIUS, tint=palette.DUST)
+                for x, y, z, r, _, _ in self.waves]
 
     # ---- geometry ---------------------------------------------------------------------------
     def poses(self):

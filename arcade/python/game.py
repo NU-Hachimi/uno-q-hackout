@@ -195,4 +195,5 @@ class Game:
             hud.state, hud.msg = g3d.STATE_LOSE, MSG_DEFEATED
         else:
             hud.state, hud.msg = g3d.STATE_PAUSED, MSG_MISSING
-        return Frame(view, self.player.objects(), hud, self.rigs(), self.player.hook_block(), flags)
+        objects = self.boss.objects() + self.player.objects()  # rings first: MAX_OBJ cuts the tail
+        return Frame(view, objects, hud, self.rigs(), self.player.hook_block(), flags)

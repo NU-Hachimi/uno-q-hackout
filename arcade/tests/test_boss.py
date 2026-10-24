@@ -174,3 +174,49 @@ def test_feet_block_the_pc_but_the_belly_does_not():
     pc = Player(scene, x=0.0, z=0.0)  # right under the torso
     pc.update(Input(), camera.ThirdPersonCamera(0.0), 0.05, boss, aim.Aim((0, 0, 0), (0, 0, 1)), [])
     assert (pc.x, pc.z) == (0.0, 0.0)
+
+
+def stomp(boss, pc, seconds=3.0):
+    """Play rear_stomp from the start and keep updating until the ring is gone; returns the max ring count."""
+    boss.state, boss.attack = STRIKING, "rear_stomp"
+    boss.play("rear_stomp")
+    rings = 0
+    for _ in range(int(seconds / 0.05)):
+        boss.update(0.05, pc)
+        rings = max(rings, len(boss.objects()))
+    return rings
+
+
+def test_stomp_ring_hurts_pc_on_the_ground_inside_its_radius():
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-10.0)
+    assert stomp(boss, pc) == 1
+    assert pc.hp == 4 and boss.waves == []
+
+
+def test_stomp_ring_misses_pc_outside_its_radius():
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-20.0)
+    stomp(boss, pc)
+    assert pc.hp == 5
+
+
+def test_stomp_ring_misses_pc_off_the_ground():
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-10.0)
+    pc.airborne = True
+    stomp(boss, pc)
+    assert pc.hp == 5
+
+
+def test_stomp_ring_is_drawn_growing_on_the_ground():
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-30.0)
+    boss.state, boss.attack = STRIKING, "rear_stomp"
+    boss.play("rear_stomp")
+    scales = []
+    for _ in range(60):
+        boss.update(0.05, pc)
+        scales += [o.scale for o in boss.objects()]
+    assert scales and scales == sorted(scales) and scales[-1] <= 14.0
+    assert all(1 <= round(s * 16) <= 255 for s in scales)

@@ -127,7 +127,7 @@ gantt
 | **A10** 岩石实例化 ✅ | `sketch/scene.*`、`render.*`、`python/world.py` | 处理 kind 2 chunk（`variant` 即网格 ID）；岩石按 yaw 和 scale 实例化，y 坐标由 `terrainHeight` 求出，超出雾距离的不画；`world.scatter_rocks` 在场地外散布 40 块岩石和废墟 | 用 g++ 比对 `terrainHeight` 与 Python 版结果一致 | 岩石贴在地面上 |
 | **A11** 性能收尾 | `sketch/render.*` | 按物体包围球的 Y 范围做分块剔除，减少分块次数 | `render_ms` 比 I2 时更低（打印对比） | 帧率体感 |
 | **B9** 钩锁 ✅ | `python/player.py`、`aim.py` | C 发射，只命中 `hookable` 碰撞体，25 m；钩爪飞行 0.3 s，以 15 m/s 拉过去；挂点存在骨骼局部坐标、跟随骨骼；再按 C 脱离并下落；挂住时伤害 ×2、免疫攻击 | `tests/test_hook.py` | 手感 |
-| **B10** 甩动、跪地、弱点、冲击波（跪地和弱点 ✅） | `python/boss.py` | 跪地、弱点只在挂住时可伤 ✅；甩动和冲击波未做 | `tests/test_boss.py`、`test_hook.py` | 节奏 |
+| **B10** 甩动、跪地、弱点、冲击波（跪地、弱点、冲击波 ✅） | `python/boss.py` | 跪地、弱点只在挂住时可伤 ✅；`rear_stomp` 砸地放出尘环，12 m/s 扩散到 14 m，扫过时在地上的 PC 扣血 ✅（预览 `17_stomp_ring.png`）；甩动未做 | `tests/test_boss.py`、`test_hook.py` | 节奏 |
 | **B11** 随机组合与难度 | `python/world.py`、`boss.py` | 每局随机部件变体；难度曲线 | 10 个种子生成的局都能打完（脚本） | 难度 |
 
 **I3（T+9:00）**：完整打一局 P1。

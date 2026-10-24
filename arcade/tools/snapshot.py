@@ -15,6 +15,7 @@ import math  # noqa: E402
 
 import g3d  # noqa: E402
 import world  # noqa: E402
+from boss import STRIKING  # noqa: E402
 from game import Game  # noqa: E402
 
 DT = 0.05
@@ -103,6 +104,16 @@ def main():
         name = f"16_{k}_day_{t:04.0f}s"
         (out / f"{name}.sky").write_bytes(g3d.pack_sky(*world.sky_at(t)))
         run(name, [raw()])
+    # The stomp's dust ring halfway out, seen from 20 m (outside its reach)
+    boss = game.boss
+    look_at((boss.x, boss.y + 3, boss.z), 20)
+    boss.state, boss.attack = STRIKING, "rear_stomp"
+    boss.play("rear_stomp")
+    steps = 0
+    while not (boss.waves and boss.waves[0][3] >= 7.0) and steps < 100:
+        game.step(raw(), DT)
+        steps += 1
+    run("17_stomp_ring", [raw()])
     print(f"wrote {out}/scene.bin and {seq} frames")
 
 
