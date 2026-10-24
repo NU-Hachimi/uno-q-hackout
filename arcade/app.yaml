@@ -1,5 +1,31 @@
-name: UNO Q Arcade Starter
-description: Read the Modulino controls and draw a live preview on the console's TFT.
+name: 巨构 Megalith
+description: |
+  Event: NEU SV Hackout
+  Track: arcade-track
+  Members: Changfeng Wang (@longwindwang1), Jinghao Zheng (@SaltyfishAlpha)
+  Summary: A low-poly 3D boss fight in the spirit of Shadow of the Colossus. You ride a horse
+    around a giant stone moose, shoot off its leg armor and back crystals, grapple onto its back
+    or brow, and finish it with an execution. Python on the MPU runs the game logic, rig
+    collision and the boss AI; the STM32 renders every frame itself (TGX, depth fog, keyframed
+    rigs, HUD) and draws it to the TFT with a custom 8080 driver.
+  Run: Import into Arduino App Lab, select the UNO Q, and run the app. On the Ready screen hold
+    the console naturally and press A; the horse rides in and the fight starts.
+  Controls: Stick left/right steers the horse (the camera follows), stick up/down is the
+    throttle. Tilt the console to look around. B shoots, C fires the hook at the boss's back
+    or brow and lets go again. A opens the menu (Continue / Restart / Recalibrate) and
+    confirms. When the boss is down to its bare weak point and you hang on it, press B to
+    FINISH HIM.
+  Setup and calibration: Modulino Buttons (0x3E), Joystick (0x2C) and Movement (0x6A) on the
+    Qwiic connector; DIYables 3.5" parallel TFT (HX8357D by default; set ARCADE_TFT_HX8357D
+    to 0 in the sketch for RM68140). Tilt neutral is sampled when you press A on the Ready
+    screen (Recalibrate in the menu redoes it). All tilt parameters (axes, dead zone, speeds,
+    pitch limits) are in python/tilt_config.py. Battle music plays through the board's audio
+    output if one is available.
+  Known limitations: About 13 fps. The boss has no dedicated death animation yet (it kneels
+    and fades into the fog), and the execution sparks use the generic spark mesh.
+  Credits: Arduino UNO Q Hackout starter (aaishikasb/uno-q-hackout); TGX 3D library by vindar
+    (LGPL-2.1, vendored in sketch/src/tgx); music rendered with the TimGM6mb soundfont by Tim
+    Brechbill (GPL-2). All meshes, rigs, animations and music were made by the team.
 ports: []
 bricks: []
 icon: "🕹️"
