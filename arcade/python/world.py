@@ -28,7 +28,7 @@ def _value_noise(seed, x, z):
     return top + (bottom - top) * fz
 
 
-def make_scene(seed=1):
+def make_scene(seed=1, rig_id=1, slot_variants=()):
     """Rolling plain with a flat arena in the middle (the boss fight happens there)."""
     n, origin = TERRAIN_N, -(TERRAIN_N - 1) * CELL / 2
     heights = []
@@ -44,7 +44,7 @@ def make_scene(seed=1):
         heights=heights, terrain_n=n, cell=CELL, origin_x=origin, origin_z=origin, height_scale=HEIGHT_SCALE,
         sky_top=d["sky_top"], sky_horizon=d["sky_horizon"], fog_color=d["fog_color"],
         fog_near=d["fog_near"] * 2, fog_far=d["fog_far"] * 2, grass_a=d["grass_a"], grass_b=d["grass_b"],
-        light_yaw=d["light_yaw"], light_pitch=d["light_pitch"])
+        light_yaw=d["light_yaw"], light_pitch=d["light_pitch"], rig_id=rig_id, slot_variants=list(slot_variants))
 
 
 def terrain_height(scene, x, z):

@@ -15,12 +15,13 @@ RECONNECT_FAILURES = 10  # api.md §4: re-run hello and the scene upload
 link = g3d.G3D(Bridge.call)
 scene = world.make_scene(seed=1)
 game = Game(scene)
-state = {"connected": False, "raw": None, "seq": 0, "last": time.monotonic()}
+state = {"connected": False, "raw": None, "seq": 0, "last": time.monotonic(), "scene_version": None}
 
 
 def connect():
     caps = link.hello()
     link.load_scene(scene)
+    state["scene_version"] = game.scene_version
     link.failures = 0
     state["connected"] = True
     print(f"g3d connected: {caps}")
@@ -38,8 +39,14 @@ def loop():
     start = time.monotonic()
     dt = min(start - state["last"], MAX_DT)
     state["last"] = start
-    cam, objs, hud, flags = game.step(state["raw"], dt)
-    state["raw"] = link.frame(g3d.pack_frame(state["seq"], cam, objs, hud, flags=flags))
+    frame = game.step(state["raw"], dt)
+    if game.scene_version != state["scene_version"]:  # Restart picked new parts
+        try:
+            link.load_scene(scene)
+            state["scene_version"] = game.scene_version
+        except Exception as error:
+            print(f"g3d scene upload failed: {error}")
+    state["raw"] = link.frame(frame.pack(state["seq"]))
     state["seq"] = (state["seq"] + 1) & 0xFF
     if link.failures >= RECONNECT_FAILURES:
         print("g3d: no replies, reconnecting")
@@ -48,5 +55,5 @@ def loop():
     time.sleep(max(0.0, FRAME_PERIOD - (time.monotonic() - start)))
 
 
-print("Arcade 3D: stick to move, tilt to look, B to shoot, A for the menu.")
+print("Arcade 3D: stick to move, tilt to look, B to shoot, C to hook, A for the menu.")
 App.run(user_loop=loop)
