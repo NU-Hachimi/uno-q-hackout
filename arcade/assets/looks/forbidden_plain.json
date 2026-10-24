@@ -1,0 +1,14 @@
+{
+ "_doc": "默认：正午、褪色、过曝",
+ "grade_mode": 1,
+ "saturation": 90,
+ "contrast": 128,
+ "brightness": 6,
+ "gamma": 72,
+ "lift": "#000000",
+ "gain": "#fff8ee",
+ "posterize": 0,
+ "dither": 0,
+ "palette": {},
+ "scene": {}
+}

@@ -7,3 +7,6 @@ build/
 !/arcade/zip/uno-q-arcade.zip
 robocar/captures/
 robocar/models/
+
+# 本地资产生成与预览工具及其输出，不提交（见 arcade/docs/art.md §9）
+arcade/tool/

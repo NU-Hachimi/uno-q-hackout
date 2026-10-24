@@ -31,7 +31,7 @@ Desktop Python is the repo-root `.venv`. It was created from miniforge's Python 
 
 `arduino-cli` is in `~/.local/bin`, so `make build` works locally. The first build downloads the core and libraries from the `sketch.yaml` profile.
 
-Much of the layout described in `api.md` and `workflow.md` (`tools/`, `tests/`, `assets/`, `sketch/gen/`, `python/gen/`, `g3d.py`, etc.) is **planned and not built yet**. Check what actually exists before assuming it.
+Much of the layout described in `api.md` and `workflow.md` (`tools/`, `tests/`, `sketch/gen/`, `python/gen/`, `g3d.py`, etc.) is **planned and not built yet**. Check what actually exists before assuming it.
 
 The root README holds the scoring rubrics; the arcade rubric is the target. The track READMEs and PREWORK.md are participant-facing docs. Keep them in sync when you change commands or defaults they quote.
 
@@ -137,7 +137,8 @@ Calibration lives in `python/preview.py`: `DEAD_ZONE`, `INVERT_X/Y`, `MOVEMENT_Z
 
 ### Assets
 
-- Sources live in `assets/rigs/*.json` and `assets/meshes/*.obj`.
+- Sources live in `assets/rigs/*.json` and `assets/meshes/*.obj`. `assets/` exists and holds `palette.json`, `looks/`, `meshes/` (23 OBJ files plus `palette.mtl`), `meshes.json` and `rigs/moose.json`. These are the promoted output of `arcade/tool/`.
+- `arcade/tool/` is **git-ignored and local**. It generates the moose and props procedurally (`gen_meshes.py`, `gen_rig.py`) and renders previews (`preview.py`, which writes PNGs and GIFs to `tool/out/preview/`). `promote.py --apply` copies approved output into `assets/`. It needs only numpy and Pillow, both in system `python3`. See `arcade/docs/art.md` §9.
 - `tools/rig_build.py` and `tools/mesh_build.py` generate `sketch/gen/` and `python/gen/`. **Never hand-edit `gen/`.**
 
 ### Ownership

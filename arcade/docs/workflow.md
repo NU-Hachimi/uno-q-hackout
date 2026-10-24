@@ -21,7 +21,8 @@
 | `sketch/**`（`gen/` 除外） | A |
 | `python/**`（`gen/` 除外） | B |
 | `tools/**`、`tests/**` | B，其中 `tests/cpp/` 归 A |
-| `assets/**` | 美术交付，B 负责导入 |
+| `assets/**` | 美术交付，B 负责导入；程序化生成的资产经 `tool/promote.py` 进入（[art.md §9](art.md#9-资产工作流)） |
+| `tool/**` | 本地资产生成与预览，**不提交**（已在 `.gitignore`） |
 | `sketch/gen/`、`python/gen/` | 只能由工具生成，**禁止手改** |
 | `docs/api.md` | **双方共同维护**，任何修改都要两人同意并递增 `G3D_VERSION` |
 
@@ -33,7 +34,7 @@
 
 - [ ] 逐字段过一遍 `api.md` §2–§5，冻结 v1。
 - [ ] 建好目录骨架：`sketch/gen/`、`python/gen/`、`tools/`、`tests/`、`assets/`。
-- [ ] 写一份占位用的 `assets/rigs/moose.json`：6 段骨骼、4 个槽位、`idle` 和 `punch_r` 两个动画。
+- [x] `assets/rigs/moose.json`：11 段骨骼、8 个槽位、8 个动画，由 `arcade/tool/` 生成（[art.md §9](art.md#9-资产工作流)）。
 - [ ] B 先实现 `pack_frame` / `pack_scene`，生成 `tests/golden/protocol.json`（每种包给 3 个样例的十六进制字节）。
 
 ### 阶段 1：各自打通（并行）
@@ -41,7 +42,7 @@
 | A：渲染端 | 验收标准 | B：玩法端 | 验收标准 |
 | --- | --- | --- | --- |
 | **A1** M0 基准：DIYables 全屏耗时、BSRR 全屏耗时、Bridge 往返时间 | 把数据填进 `research.md` §5 | **B1** `g3d.py` 的打包和解包，通过 golden 测试 | `pytest tests/` 通过 |
-| **A2** `tft8080` 快速驱动 | 全屏 < 50 ms，画面无错位 | **B2** `tools/rig_build.py` + `mesh_build.py --placeholder` | 生成两端代码和 golden 姿态数据 |
+| **A2** `tft8080` 快速驱动 | 全屏 < 50 ms，画面无错位 | **B2** `tools/rig_build.py` + `mesh_build.py --placeholder` + `palette.json` / `font_build.py` | 生成两端代码和 golden 姿态数据 |
 | **A3** 集成 TGX，分块渲染一个旋转立方体 | ≥ 15 fps，并确认 LLEXT 内存放得下 | **B3** `tools/sim.py`：键盘输入，用 pygame 线框渲染 Frame 包 | 能在电脑上走动并看到 BOSS 线框 |
 | **A4** `rpc` + `scene`：接收场景包，构建地形 | 用 `tools/replay.py` 发送 golden 包，显示正确 | **B4** `world.py` / `rig.py` / `collide.py` | 和 golden 姿态比对误差 ≤ 1 cm |
 
@@ -56,8 +57,8 @@ B 的 `main.py` 只发静态场景和绕圈相机，A 的渲染端负责显示�
 | A：渲染端 | B：玩法端 |
 | --- | --- |
 | **A5** `rig.cpp`：姿态计算、槽位绘制、`hit_slot` 闪烁 | **B5** `Game` 状态机（Ready → Fight → Win/Lose → 重开） |
-| **A6** 深度雾 LUT + 天空渐变 + 地形双色草地 | **B6** `Player`：移动、闪避、射击、倾斜瞄准 |
-| **A7** HUD：血格、BOSS 血条、准星、`msg_id` 文案、结算画面 | **B7** `Boss`：idle / punch，部件血量，`events` 攻击判定 |
+| **A6** 深度雾 LUT + 天空渐变 + 地形双色草地 + 调色板渲染与调色模式 1 | **B6** `Player`：移动、闪避、射击、倾斜瞄准 |
+| **A7** HUD（像素字体）：血格、BOSS 血条、准星、`msg_id` 文案、结算画面 | **B7** `Boss`：idle / punch，部件血量，`events` 攻击判定 |
 | **A8** Input 增加陀螺仪 `gx/gy` | **B8** `Camera`：第三人称 + C 键锁定 |
 
 **联调 I2**：完整打一局 P0。按评分表自测：新玩家能否看懂目标、打完一局并重开。
@@ -68,7 +69,7 @@ B 的 `main.py` 只发静态场景和绕圈相机，A 的渲染端负责显示�
 | --- | --- |
 | **A9** 绳索 3D 线段、钩爪物体 | **B9** 钩锁：射线检测、飞行、挂点跟随骨骼、脱离 |
 | **A10** 岩石实例化 | **B10** 甩动、跪地阶段、头部弱点、冲击波 |
-| **A11** 性能收尾：剔除、减少分块次数，`render_ms` 达标 | **B11** 部件随机组合、难度曲线 |
+| **A11** 性能收尾：剔除、减少分块次数，`render_ms` 达标；预算允许时做调色模式 2 | **B11** 部件随机组合、难度曲线、Look 预设 |
 
 **联调 I3**：完整一局 P1。
 

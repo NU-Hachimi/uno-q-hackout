@@ -1,0 +1,14 @@
+{
+ "_doc": "复古：forbidden_plain + 色阶 + 抖动，需要逐像素模式",
+ "grade_mode": 2,
+ "saturation": 90,
+ "contrast": 128,
+ "brightness": 6,
+ "gamma": 72,
+ "lift": "#000000",
+ "gain": "#fff8ee",
+ "posterize": 5,
+ "dither": 1,
+ "palette": {},
+ "scene": {}
+}

@@ -1,0 +1,22 @@
+{
+ "_doc": "黄昏、金色",
+ "grade_mode": 1,
+ "saturation": 109,
+ "contrast": 136,
+ "brightness": 0,
+ "gamma": 64,
+ "lift": "#1a1024",
+ "gain": "#ffd8a8",
+ "posterize": 0,
+ "dither": 0,
+ "palette": {},
+ "scene": {
+  "sky_top": "#6c6a8a",
+  "sky_horizon": "#e8b888",
+  "fog_color": "#d8b490",
+  "fog_near": 16,
+  "fog_far": 55,
+  "light_yaw": 200,
+  "light_pitch": 12
+ }
+}

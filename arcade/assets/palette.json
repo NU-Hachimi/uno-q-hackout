@@ -1,0 +1,233 @@
+{
+ "_doc": "默认调色板。索引 0 保留；索引含义固定，Look 只改颜色值。见 docs/art.md §3、docs/api.md §5.4",
+ "colors": [
+  {
+   "index": 1,
+   "name": "FUR_DARK",
+   "rgb": "#3b3430",
+   "rgb565": "0x39A6",
+   "use": "巨像身体主色"
+  },
+  {
+   "index": 2,
+   "name": "FUR_MID",
+   "rgb": "#574c43",
+   "rgb565": "0x5268",
+   "use": "身体亮面 / 过渡"
+  },
+  {
+   "index": 3,
+   "name": "FUR_LIGHT",
+   "rgb": "#7a6a58",
+   "rgb565": "0x7B4B",
+   "use": "可挂钩毛丛"
+  },
+  {
+   "index": 4,
+   "name": "MASK",
+   "rgb": "#4a4844",
+   "rgb565": "0x4A48",
+   "use": "面具、蹄子等深石色"
+  },
+  {
+   "index": 5,
+   "name": "STONE_LIGHT",
+   "rgb": "#b8b2a2",
+   "rgb565": "0xBD94",
+   "use": "护甲石板亮面、鹿角"
+  },
+  {
+   "index": 6,
+   "name": "STONE_MID",
+   "rgb": "#8e887a",
+   "rgb565": "0x8C4F",
+   "use": "护甲石板"
+  },
+  {
+   "index": 7,
+   "name": "STONE_DARK",
+   "rgb": "#625e55",
+   "rgb565": "0x62EA",
+   "use": "石板侧面、刻纹"
+  },
+  {
+   "index": 8,
+   "name": "MOSS",
+   "rgb": "#6f7556",
+   "rgb565": "0x6BAA",
+   "use": "石板上的苔藓"
+  },
+  {
+   "index": 9,
+   "name": "SIGIL",
+   "rgb": "#8fe3ff",
+   "rgb565": "0x8F1F",
+   "use": "符印 / 结晶 / 弱点发光"
+  },
+  {
+   "index": 10,
+   "name": "SIGIL_DIM",
+   "rgb": "#4a8fb0",
+   "rgb565": "0x4C76",
+   "use": "符印暗部"
+  },
+  {
+   "index": 11,
+   "name": "PC_TUNIC",
+   "rgb": "#d9d2bf",
+   "rgb565": "0xDE97",
+   "use": "PC 短袍"
+  },
+  {
+   "index": 12,
+   "name": "PC_CLOAK",
+   "rgb": "#2e2a28",
+   "rgb565": "0x2945",
+   "use": "PC 斗篷、头发"
+  },
+  {
+   "index": 13,
+   "name": "PC_ACCENT",
+   "rgb": "#b04a32",
+   "rgb565": "0xB246",
+   "use": "PC 腰带（唯一暖色点）"
+  },
+  {
+   "index": 14,
+   "name": "PC_SKIN",
+   "rgb": "#c49a7c",
+   "rgb565": "0xC4CF",
+   "use": "PC 皮肤"
+  },
+  {
+   "index": 15,
+   "name": "METAL",
+   "rgb": "#9a9488",
+   "rgb565": "0x9CB1",
+   "use": "武器"
+  },
+  {
+   "index": 16,
+   "name": "GRASS_A",
+   "rgb": "#7c8460",
+   "rgb565": "0x7C2C",
+   "use": "草地 A"
+  },
+  {
+   "index": 17,
+   "name": "GRASS_B",
+   "rgb": "#8f9468",
+   "rgb565": "0x8CAD",
+   "use": "草地 B"
+  },
+  {
+   "index": 18,
+   "name": "DIRT",
+   "rgb": "#8a7d66",
+   "rgb565": "0x8BEC",
+   "use": "裸土"
+  },
+  {
+   "index": 19,
+   "name": "ROCK_A",
+   "rgb": "#a09a8c",
+   "rgb565": "0xA4D1",
+   "use": "岩石亮面"
+  },
+  {
+   "index": 20,
+   "name": "ROCK_B",
+   "rgb": "#7d786e",
+   "rgb565": "0x7BCD",
+   "use": "岩石暗面"
+  },
+  {
+   "index": 21,
+   "name": "ROPE",
+   "rgb": "#a89270",
+   "rgb565": "0xAC8E",
+   "use": "绳索"
+  },
+  {
+   "index": 22,
+   "name": "HOOK",
+   "rgb": "#6a6a6a",
+   "rgb565": "0x6B4D",
+   "use": "钩爪"
+  },
+  {
+   "index": 23,
+   "name": "BULLET",
+   "rgb": "#fff2c8",
+   "rgb565": "0xFF99",
+   "use": "弹丸"
+  },
+  {
+   "index": 24,
+   "name": "SPARK",
+   "rgb": "#ffd890",
+   "rgb565": "0xFED2",
+   "use": "火花、碎屑"
+  },
+  {
+   "index": 25,
+   "name": "DUST",
+   "rgb": "#d0c3a6",
+   "rgb565": "0xD614",
+   "use": "冲击波尘环"
+  },
+  {
+   "index": 26,
+   "name": "FLASH",
+   "rgb": "#ffffff",
+   "rgb565": "0xFFFF",
+   "use": "部件受击闪烁"
+  },
+  {
+   "index": 27,
+   "name": "HURT",
+   "rgb": "#c03a2a",
+   "rgb565": "0xC1C5",
+   "use": "PC 受击、血格空"
+  },
+  {
+   "index": 28,
+   "name": "HUD_TEXT",
+   "rgb": "#f0ece0",
+   "rgb565": "0xF77C",
+   "use": "HUD 文字"
+  },
+  {
+   "index": 29,
+   "name": "HUD_SHADOW",
+   "rgb": "#1a1816",
+   "rgb565": "0x18C2",
+   "use": "文字阴影"
+  },
+  {
+   "index": 30,
+   "name": "HUD_BAR",
+   "rgb": "#c8b48a",
+   "rgb565": "0xCDB1",
+   "use": "BOSS 血条"
+  },
+  {
+   "index": 31,
+   "name": "HOOK_OK",
+   "rgb": "#ffe080",
+   "rgb565": "0xFF10",
+   "use": "可挂钩准星"
+  }
+ ],
+ "scene_defaults": {
+  "sky_top": "#9aa8b0",
+  "sky_horizon": "#dcd8c8",
+  "fog_color": "#cfcbbd",
+  "grass_a": "GRASS_A",
+  "grass_b": "GRASS_B",
+  "fog_near": 20,
+  "fog_far": 60,
+  "light_yaw": 40,
+  "light_pitch": 36
+ }
+}

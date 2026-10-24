@@ -1,0 +1,126 @@
+{
+ "meshes": [
+  {
+   "id": 0,
+   "name": "pc",
+   "tris": 60,
+   "attach": {
+    "hand": [
+     0.28,
+     1.1,
+     0.12
+    ]
+   }
+  },
+  {
+   "id": 1,
+   "name": "bullet",
+   "tris": 8
+  },
+  {
+   "id": 2,
+   "name": "boss_shot",
+   "tris": 8
+  },
+  {
+   "id": 3,
+   "name": "hook_head",
+   "tris": 12
+  },
+  {
+   "id": 4,
+   "name": "spark",
+   "tris": 4
+  },
+  {
+   "id": 5,
+   "name": "shockwave_ring",
+   "tris": 32
+  },
+  {
+   "id": 16,
+   "name": "moose_torso",
+   "tris": 89
+  },
+  {
+   "id": 17,
+   "name": "moose_neck",
+   "tris": 20
+  },
+  {
+   "id": 18,
+   "name": "moose_head",
+   "tris": 128
+  },
+  {
+   "id": 19,
+   "name": "moose_leg_f",
+   "tris": 8
+  },
+  {
+   "id": 20,
+   "name": "moose_leg_b",
+   "tris": 8
+  },
+  {
+   "id": 21,
+   "name": "moose_shin",
+   "tris": 18
+  },
+  {
+   "id": 22,
+   "name": "armor_plate_a",
+   "tris": 28
+  },
+  {
+   "id": 23,
+   "name": "armor_plate_b",
+   "tris": 30
+  },
+  {
+   "id": 24,
+   "name": "crystal_a",
+   "tris": 29
+  },
+  {
+   "id": 25,
+   "name": "crystal_b",
+   "tris": 24
+  },
+  {
+   "id": 26,
+   "name": "armor_back",
+   "tris": 40
+  },
+  {
+   "id": 27,
+   "name": "head_cap",
+   "tris": 16
+  },
+  {
+   "id": 28,
+   "name": "sigil_weak",
+   "tris": 16
+  },
+  {
+   "id": 29,
+   "name": "rock_a",
+   "tris": 20
+  },
+  {
+   "id": 30,
+   "name": "rock_b",
+   "tris": 20
+  },
+  {
+   "id": 31,
+   "name": "pillar_broken",
+   "tris": 16
+  },
+  {
+   "id": 32,
+   "name": "arch_fragment",
+   "tris": 27
+  }
+ ]
+}

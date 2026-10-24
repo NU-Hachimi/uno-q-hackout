@@ -83,7 +83,7 @@ gantt
 | 0.1 | 两人 | 逐字段过一遍 api.md §2–§5，冻结 v1 |
 | 0.2 | Claude | 统一 core 版本：`sketch/sketch.yaml` 锁定为板子上的 `arduino:zephyr 1.0.0`（research §2）；在 README 的 Board software 小节同步版本号 |
 | 0.3 | Claude | 建目录：`sketch/gen/`、`python/gen/`、`tools/`、`tests/{golden,cpp}/`、`assets/{rigs,meshes}/` |
-| 0.4 | Claude 起草，两人审核 | `assets/rigs/moose.json`：6 段骨骼、4 个槽位、`idle` 和 `punch_r` 动画（带 `hit` 事件）；`assets/meshes.json` 的 0–5 号网格 |
+| 0.4 ✅ | Claude 起草，两人审核 | `assets/rigs/moose.json`：11 段骨骼、8 个槽位、8 个动画（含 `idle`、带 `hit` 事件的 `punch_r`）；`assets/meshes.json` 含 0–5 号固定网格和 16 号起的全部网格。由 `arcade/tool/` 生成，见 art.md §2、§9 |
 | 0.5 ✅ | Claude | 本地工具：仓库根目录的 `.venv`（Python 3.14，含 pytest、pygame-ce）；arduino-cli 装在 `~/.local/bin`；`make build` 能在电脑上编译通过，Flash 用 17%，RAM 用 55 KB / 256 KB |
 | 0.6 ✅ | Claude | 板子自检：`make flash` 成功；三个 Modulino 均已连接（`connected = 7`）；`arcade_read_inputs` 往返 16–108 ms（与 starter 的绘制循环同时运行时测得） |
 

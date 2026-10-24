@@ -1,0 +1,21 @@
+{
+ "_doc": "阴天、冷峻",
+ "grade_mode": 1,
+ "saturation": 58,
+ "contrast": 154,
+ "brightness": -8,
+ "gamma": 60,
+ "lift": "#0a1014",
+ "gain": "#d8e4ec",
+ "posterize": 0,
+ "dither": 0,
+ "palette": {},
+ "scene": {
+  "sky_top": "#6e7a82",
+  "sky_horizon": "#a4aaa8",
+  "fog_color": "#9ea4a2",
+  "fog_near": 12,
+  "fog_far": 45,
+  "light_pitch": 44
+ }
+}
