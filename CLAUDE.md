@@ -96,9 +96,10 @@ Calibration lives in `python/preview.py`: `DEAD_ZONE`, `INVERT_X/Y`, `MOVEMENT_Z
 ## Renderer built so far (branch `render/grass-demo`)
 
 - **`G3D_DEMO` mode:** `sketch.ino` defaults to `G3D_DEMO 1`, which renders an orbiting misty meadow on the MCU. The starter's `drawFrame` and RetroArch paths are disabled while it is on.
-- **Files:** `tft8080.*` does BSRR pixel writes, `scene.*` holds the terrain parameters and heights, and `render.*` is platform-independent TGX code (sky, grass, fog, 240×16 tiles).
+- **Files:** `tft8080.*` does BSRR pixel writes, `scene.*` holds the terrain parameters and heights, and `render.*` is platform-independent TGX code (sky, grass, fog, 240×32 tiles, built at `-O2` via a pragma; the core defaults to `-Os`).
 - **TGX is vendored** in `sketch/src/tgx/`; see `VENDORED.md`. Don't switch back to the registry library, which fails to compile on the Zephyr core. `.inl` files are renamed to `.inl.h` because arduino-cli doesn't copy `.inl` files.
 - **Desktop preview:** run `sh tests/cpp/render_preview.sh 0 10` from `arcade/`. It compiles `scene.cpp` and `render.cpp` with g++ and writes `build/preview/t*.png`; Read those PNGs to check the image before flashing. `-DRENDER_NO_CULL=1` and `-DRENDER_NO_FOG=1` (passed via `CXXFLAGS`) help isolate bugs.
+- **Push timing:** `tft8080.cpp` is built at `-O3`, which makes GPIO stores back to back. `TFT_WR_NOPS=3` and `TFT_WR_HOLD_NOPS=3` are the verified-safe values (about 29.5 ms per full screen). Lower values garbled the panel. Any change to the push loop needs a human to look at the screen, because the desktop preview can't catch bus timing.
 - **Board-side check:** `g3d_debug_stats` is a debug-only RPC registered with `Bridge.provide`, not `provide_safe`, so it answers even if `setup()` stalls. It returns the init stage (8 = render loop running) plus fps, `render_ms` and `push_ms`. To read it, call it through `/var/run/arduino-router.sock` from board-side Python; the board has no msgpack module, so the client needs a minimal hand-written msgpack.
 - **Stuck sketch:** if the sketch never starts, the CPU sits idle in the kernel. You can halt it over SWD without resetting by running `/opt/openocd/bin/openocd` with `openocd_gpiod.cfg` + `reset_config none` to read PC and the fault registers. Always `resume` afterwards.
 - **Rendering conventions:**

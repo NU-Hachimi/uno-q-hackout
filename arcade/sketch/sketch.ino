@@ -174,10 +174,11 @@ bool endVideo(int session) {
 }
 
 uint32_t statFrames = 0, statRenderUs = 0, statPushUs = 0, statStartMs = 0;
+uint32_t statSkyUs = 0, statRasterUs = 0, statFogUs = 0, statSetupUs = 0;
 volatile int initStage = 0;  // last setup() step reached; reported by g3d_debug_stats
 String lastStats = "{}";
 
-// Each 240x16 tile becomes 480x32 on the panel; Bridge requests are served between tiles.
+// Each 240xTILE_H tile is pushed at 2x (480x2*TILE_H) on the panel.
 void pushTile(int tile, const uint16_t* pixels) {
   uint32_t start = micros();
   tft::window(0, tile * render::TILE_H * 2, render::W * 2 - 1, (tile + 1) * render::TILE_H * 2 - 1);
@@ -186,7 +187,8 @@ void pushTile(int tile, const uint16_t* pixels) {
     tft::pushRow2x(pixels + y * render::W, render::W);
   }
   statPushUs += micros() - start;
-  safeUpdate();
+  // Serve Bridge once mid-frame; each idle safeUpdate() sleeps 1 ms, so not after every tile.
+  if (tile == render::TILES / 2) safeUpdate();
 }
 
 // Debug only (not part of the api.md contract): init stage and frame timing for desktop checks.
@@ -199,16 +201,25 @@ void renderDemoFrame() {
   uint32_t pushBefore = statPushUs;
   render::frame(render::demoCamera(millis() / 1000.0f), pushTile);
   statRenderUs += (micros() - start) - (statPushUs - pushBefore);
+  const render::Profile& prof = render::lastProfile();
+  statSetupUs += prof.setupUs;
+  statSkyUs += prof.skyUs;
+  statRasterUs += prof.rasterUs;
+  statFogUs += prof.fogUs;
   ++statFrames;
   uint32_t now = millis();
   if (now - statStartMs >= 2000) {
-    char json[160];
+    char json[240];
+    const float perFrame = 1000.0f * statFrames;
     snprintf(json, sizeof(json),
-             "{\"fps\":%.1f,\"render_ms\":%.1f,\"push_ms\":%.1f,\"quads\":%d,\"frames\":%lu}",
-             statFrames * 1000.0f / (now - statStartMs), statRenderUs / 1000.0f / statFrames,
-             statPushUs / 1000.0f / statFrames, render::lastQuadDraws(), (unsigned long)statFrames);
+             "{\"fps\":%.1f,\"render_ms\":%.1f,\"push_ms\":%.1f,\"setup_ms\":%.1f,\"sky_ms\":%.1f,"
+             "\"raster_ms\":%.1f,\"fog_ms\":%.1f,\"quads\":%d,\"frames\":%lu}",
+             statFrames * 1000.0f / (now - statStartMs), statRenderUs / perFrame, statPushUs / perFrame,
+             statSetupUs / perFrame, statSkyUs / perFrame, statRasterUs / perFrame, statFogUs / perFrame,
+             render::lastQuadDraws(), (unsigned long)statFrames);
     lastStats = json;
     statFrames = statRenderUs = statPushUs = 0;
+    statSetupUs = statSkyUs = statRasterUs = statFogUs = 0;
     statStartMs = now;
   }
 }
@@ -232,6 +243,7 @@ void setup() {
   scene::buildDemo(1);
   initStage = 5;
   render::begin();
+  render::setClock([]() -> uint32_t { return micros(); });
   initStage = 6;
 #else
   display.fillScreen(TFT_BLACK);

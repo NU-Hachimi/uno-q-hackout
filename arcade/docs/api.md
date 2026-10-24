@@ -274,7 +274,7 @@ void pose(uint8_t rig_id, uint8_t anim, uint8_t phase, tgx::fMat4 out[]);   // �
 // render.h
 namespace render {
 void begin();                                   // TGX Renderer3D<RGB565, PERSPECTIVE|ZBUFFER|FLAT|GOURAUD, uint16_t>
-void frame(const FramePacket& f);               // 按 240×16 分块：天空 → 地形 → 岩石 → BOSS → 物体 → 绳索 → 雾 → HUD → pushRow2x
+void frame(const FramePacket& f);               // 按 240×32 分块：天空 → 地形 → 岩石 → BOSS → 物体 → 绳索 → 雾 → HUD → pushRow2x
 }
 
 // rpc.h
@@ -286,7 +286,7 @@ bool takePending(FramePacket& out);             // loop() 每次取最新的一�
 
 渲染要点：
 
-- **分块渲染**：渲染分辨率 240×160，每块 240×16，颜色缓冲和 z-buffer 各 7.5 KB，共 10 块。每块之前先按物体包围球在屏幕上的 Y 范围做剔除，避免每块都重新变换全部网格。
+- **分块渲染**：渲染分辨率 240×160，每块 240×32，颜色缓冲和 z-buffer 各 15 KB，共 5 块（实测比 240×16 少一半重复的三角形设置）。每块之前先按物体包围球在屏幕上的 Y 范围做剔除，避免每块都重新变换全部网格。
 - **雾**：一块渲染完后逐像素读取 z-buffer，用 16 级查找表把颜色混向 `fog_color`；超过 `fog_far` 的部分直接画成雾色。
 - **HUD**：在每块内绘制落在该块范围里的部分，不额外推屏，也就不会闪烁。
 - **演示模式**：编译时定义 `G3D_DEMO=1`，sketch 内置一个相机绕 BOSS 转圈、循环播放全部动画的演示，不需要 Python 就能运行。

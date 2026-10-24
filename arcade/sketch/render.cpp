@@ -1,3 +1,6 @@
+// The core compiles sketches with -Os; TGX's rasterizer templates are instantiated here.
+#pragma GCC optimize("O2")
+
 #include "render.h"
 
 #include <math.h>
@@ -24,7 +27,7 @@ constexpr int FOG_STEPS = 16;
 constexpr int MAX_VERTS = scene::MAX_N * scene::MAX_N;
 
 Renderer3D<RGB565, SHADERS, uint16_t> renderer;
-RGB565 tileBuf[W * TILE_H];
+alignas(4) RGB565 tileBuf[W * TILE_H];
 uint16_t zbuf[W * TILE_H];
 Image<RGB565> tileImage(tileBuf, W, TILE_H);
 
@@ -32,8 +35,9 @@ fVec3 verts[MAX_VERTS];
 RGBf colors[MAX_VERTS];
 float screenY[MAX_VERTS];  // viewport row of each vertex this frame; NAN when behind the eye
 uint8_t fogAlpha[4096];    // zbuffer >> 4 -> blend weight 0..32 towards fogColor
-uint16_t skyRows[H][2];  // each row dithers between two neighbouring blend steps
-uint8_t skyLevel[H];     // share of the second colour, 0..16
+uint32_t (*clockUs)() = nullptr;
+Profile profile;
+uint32_t skyPattern[H][2];  // per row: 4 dithered pixels packed as two words, repeated across
 int quadDraws = 0;
 
 RGBf toRGBf(uint16_t c) {
@@ -109,11 +113,17 @@ void prepareFrame(const Camera& cam, fMat4& projView) {
     const float elevation = cam.pitch + atanf((H / 2 - (y + 0.5f)) / focal);
     float t = elevation / SKY_SPAN;
     t = t < 0 ? 0 : (t > 1 ? 1 : t);
+    // Ordered dither between neighbouring blend steps hides RGB565 banding.
+    static const uint8_t BAYER4[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
     const float steps = t * 32;
     const uint32_t step = uint32_t(steps);
-    skyRows[y][0] = blend565(p.skyHorizon, p.skyTop, step);
-    skyRows[y][1] = blend565(p.skyHorizon, p.skyTop, step < 32 ? step + 1 : 32);
-    skyLevel[y] = uint8_t((steps - step) * 16);
+    const uint16_t c0 = blend565(p.skyHorizon, p.skyTop, step);
+    const uint16_t c1 = blend565(p.skyHorizon, p.skyTop, step < 32 ? step + 1 : 32);
+    const uint8_t level = uint8_t((steps - step) * 16);
+    uint16_t px[4];
+    for (int x = 0; x < 4; ++x) px[x] = BAYER4[y & 3][x] < level ? c1 : c0;
+    skyPattern[y][0] = px[0] | (uint32_t(px[1]) << 16);  // little-endian: first pixel in the low half
+    skyPattern[y][1] = px[2] | (uint32_t(px[3]) << 16);
   }
 }
 
@@ -135,9 +145,13 @@ void begin() {
   bakeFog();
 }
 
+inline uint32_t now() { return clockUs ? clockUs() : 0; }
+
 void frame(const Camera& cam, PushTile push) {
   const scene::Params& p = scene::params;
   const int n = p.terrainN;
+  profile = Profile{};
+  uint32_t t0 = now();
   fMat4 projView;
   prepareFrame(cam, projView);
 
@@ -148,17 +162,24 @@ void frame(const Camera& cam, PushTile push) {
   }
 
   quadDraws = 0;
+  profile.setupUs = now() - t0;
   uint16_t* pixels = reinterpret_cast<uint16_t*>(tileBuf);
   for (int tile = 0; tile < TILES; ++tile) {
     const int top = tile * TILE_H;
+    t0 = now();
     renderer.setOffset(0, top);
+    uint32_t* words = reinterpret_cast<uint32_t*>(pixels);
     for (int y = 0; y < TILE_H; ++y) {
-      static const uint8_t BAYER4[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
-      const int row = top + y;
-      for (int x = 0; x < W; ++x)
-        pixels[y * W + x] = skyRows[row][BAYER4[row & 3][x & 3] < skyLevel[row]];
+      const uint32_t w0 = skyPattern[top + y][0], w1 = skyPattern[top + y][1];
+      for (int x = 0; x < W / 2; x += 2) {
+        words[x] = w0;
+        words[x + 1] = w1;
+      }
+      words += W / 2;
     }
     renderer.clearZbuffer();
+    uint32_t t1 = now();
+    profile.skyUs += t1 - t0;
 
     for (int j = 0; j + 1 < n; ++j) {
       for (int i = 0; i + 1 < n; ++i) {
@@ -175,15 +196,22 @@ void frame(const Camera& cam, PushTile push) {
       }
     }
 
+    uint32_t t2 = now();
+    profile.rasterUs += t2 - t1;
     for (int i = 0; i < W * TILE_H; ++i) {
       const uint16_t z = zbuf[i];
-      if (z && !RENDER_NO_FOG) pixels[i] = blend565(pixels[i], p.fogColor, fogAlpha[z >> 4]);
+      if (!z || RENDER_NO_FOG) continue;  // sky
+      const uint32_t a = fogAlpha[z >> 4];
+      if (a) pixels[i] = blend565(pixels[i], p.fogColor, a);
     }
+    profile.fogUs += now() - t2;
     push(tile, pixels);
   }
 }
 
 int lastQuadDraws() { return quadDraws; }
+void setClock(uint32_t (*micros)()) { clockUs = micros; }
+const Profile& lastProfile() { return profile; }
 
 Camera demoCamera(float seconds) {
   const float angle = seconds * 2 * float(M_PI) / 40;
