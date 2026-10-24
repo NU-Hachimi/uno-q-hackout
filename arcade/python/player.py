@@ -129,6 +129,7 @@ class Player:
         self.rng = random.Random(seed)
         self.steer = 0.0         # rad turned by the stick this frame; the camera turns with it
         self.speed = 0.0         # throttle, -REVERSE_FRACTION..1
+        self.boost = 1.0         # speed multiplier; the intro gallops faster than the player can
         self.gait = 0.0          # gallop phase, 0..256
         self.standing = True     # stick released: the horse plays `stand`
         self.stand_time = 0.0
@@ -224,9 +225,9 @@ class Player:
         if abs(self.speed) > 1e-3:
             f = camera.forward(self.yaw)
             lo, hi = world.extent(self.scene, EDGE_MARGIN)
-            self.x = min(hi, max(lo, self.x + f[0] * self.speed * SPEED * dt))
-            self.z = min(hi, max(lo, self.z + f[2] * self.speed * SPEED * dt))
-        gait = max(abs(self.speed), TURN_GAIT * abs(inp.move_x))
+            self.x = min(hi, max(lo, self.x + f[0] * self.speed * SPEED * self.boost * dt))
+            self.z = min(hi, max(lo, self.z + f[2] * self.speed * SPEED * self.boost * dt))
+        gait = max(abs(self.speed) * self.boost, TURN_GAIT * abs(inp.move_x))
         self.standing = gait < 0.05
         if self.standing:
             self.stand_time += dt

@@ -112,7 +112,7 @@ gantt
 | **A6** 雾、天空、草地 | `sketch/render.*` | z-buffer 深度雾配 16 级查找表；天空两色渐变；地形按两种草色交错着色 | `flags.bit1` 开关雾，分别打印两种情况的 `render_ms` | 雾的效果和远处的隐没 |
 | **A7** HUD（基础版 ✅） | `sketch/hud.*`、`hud_text.h`、`hud_font.h` | 血格、BOSS 血条、准星（十字 / 部件四角 / 可挂钩菱形）、`msg_id` 文案、暂停菜单（`msg_id` 9–11 高亮）、Ready 和结算提示；只画在当前分块内。字体暂用 Adafruit GFX 的 5×7，等 `assets/fonts/` 和 `font_build.py` | 桌面预览 `--snapshots` 的 5 张图 | 5 种布局清楚可读 |
 | **A8** 陀螺仪（可选） | `sketch/rpc.*` | 在 Input 中填入 `gx/gy`。视角改由加速度的倾斜速率控制，陀螺仪不再必需 | Python 日志中转动掌机时 `gx/gy` 有变化 | — |
-| **B5** `Game`（Ready / Fight / 菜单 ✅） | `python/game.py`、`main.py` | Ready → Fight ⇄ 菜单（Continue / Restart / Recalibrate）→ Win/Lose → 重开；每局重置；控件断开时进入 Paused，重连后回到菜单 | `tests/test_game.py` 用脚本输入断言状态切换 | Ready 按 A 开局，A 打开菜单，三项都能用 |
+| **B5** `Game`（Ready / Intro / Fight / 菜单 ✅） | `python/game.py`、`main.py` | Ready（雾外骑马绕圈）→ Intro（自动骑向 BOSS，A 跳过，预览 `2a_intro_fog`、`2b_intro_near`）→ Fight ⇄ 菜单（Continue / Restart / Recalibrate）→ Win/Lose → 重开；每局重置；控件断开时进入 Paused，重连后回到菜单 | `tests/test_game.py` 用脚本输入断言状态切换 | Ready 按 A 开局，A 打开菜单，三项都能用 |
 | **B6** `Player`（移动 + 射击 ✅，瞄准吸附待做） | `python/player.py`、`controls.py` | 移动（相对相机）、倾斜视角（速率控制 + 死区，开局采样中立姿势，**轴向和正负号在板上实测**）、B 射击（冷却连发，子弹飞向准星对地形的交点，落地冒火花）、血格；瞄准吸附等 BOSS 有碰撞体后做 | 单元测试：前推摇杆远离相机、按住 B 的射速、短按也能射出、倾斜死区 | 手感 |
 | **B7** `Boss` ✅ | `python/boss.py` | 平时不转身；人物 14 m 内时每 5–8 s：慢慢转向 → `punch_r` / `sweep` / `rear_stomp`，按 `events` 判定扣血；14–35 m 时刨地（`paw`）后冲撞（`charge`，预览 `18_charge.png`）；2 腿甲 + 背 + 头；腿甲碎后跪地不再攻击；腿和背碎后石盖碎、露出弱点 | `tests/test_boss.py` | 前摇看得清、躲得开 |
 | **B8** `Camera`（基础版 ✅） | `python/camera.py` | 第三人称：PC 身后 6 m、右肩偏移 0.7 m；倾斜控制偏航和俯仰，俯仰限制在 −35° 到 +25°；不低于地面 0.4 m；BOSS 不在画面里时自动回正（等 BOSS） | 桌面预览检查相机不会穿进地形 | 画面不抖、能找到 BOSS |
@@ -141,7 +141,7 @@ gantt
 | **P2-1** 猩猩主体 | B 起草 rig JSON，两端联调 | `assets/rigs/gorilla.json` 和对应动画；`rig_id = 2` |
 | **P2-2** 结晶射击 | B（`boss_shot` 物体），A（发光效果） | 结晶发光作为前摇，然后发射弹丸 |
 | **P2-3** 近景草丛面片 | A | 只在相机附近画面片，并做距离剔除 |
-| **P2-4** 音效 | B | 从 MPU 的 ALSA 耳机口播放（research §1），由事件触发 |
+| **P2-4** 音效（BGM ✅） | B | 从 MPU 的耳机口播放（research §1）。BGM：`python/audio.py` 用一个常驻的 `aplay -D default`（容器里经 PipeWire 到耳机口）播放 `python/music/*.wav`，无缝循环，状态切换时淡出；Ready 和菜单半音量，开场和 Fight 全音量，胜负时播短曲。音效（射击、击碎、钩锁）待做，可以混进同一条流 |
 
 ## 5. 降级方案
 

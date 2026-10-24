@@ -1,4 +1,8 @@
-"""Round state machine: Ready -> Fight <-> Menu -> Win / Lose, with Restart and Recalibrate (docs/plan.md)."""
+"""Round state machine: Ready -> Intro -> Fight <-> Menu -> Win / Lose, with Restart and Recalibrate (docs/plan.md).
+
+Ready: the PC rides back and forth far out, beyond the fog, with the boss hidden and the camera behind it.
+A starts the intro: the PC turns and gallops on its own towards the boss, which looms out of the fog, and reins in at the fight spawn; then the
+player has control. A during the intro skips to the end of it."""
 
 import math
 import random
@@ -9,11 +13,12 @@ import g3d
 import world
 from boss import Boss, pick_parts
 from camera import ThirdPersonCamera
-from controls import BTN_A, BTN_B, Controls
+from controls import BTN_A, BTN_B, Controls, Input
 from finisher import Finisher
 from player import HP_MAX, Player
 
-READY, FIGHT, MENU, MISSING, WIN, LOSE, EXECUTE = "ready", "fight", "menu", "missing", "win", "lose", "execute"
+READY, INTRO, FIGHT, MENU, MISSING, WIN, LOSE, EXECUTE = (
+    "ready", "intro", "fight", "menu", "missing", "win", "lose", "execute")
 
 MSG_ARMOR = 2            # objective messages (api.md §3.5)
 MSG_HOOK_ON = 3
@@ -32,6 +37,15 @@ MENU_REPEAT = 0.3        # s between menu steps while the stick is held
 REQUIRED = 7             # Buttons, Joystick and Movement must all be connected
 SHAKE_SECONDS = 0.35     # camera shake after a stomp or kick lands
 SHAKE_HZ = 9.0
+
+READY_SPAWN = (0.0, -108.0)  # (x, z): beyond the fog (fog_far 120 m, art.md §4) from the boss at the centre
+READY_TURNS = 40.0           # m; in Ready the PC rides along z = READY_SPAWN between x = -this and +this
+READY_THROTTLE = 0.45
+FIGHT_SPAWN = (0.0, -30.0)   # where the intro ends and the player takes over
+INTRO_BOOST = 1.25           # a little faster than the player's top speed
+INTRO_BRAKE = 12.0           # m before the spawn where the horse starts reining in
+INTRO_ARRIVE = 0.3           # m; this close to the spawn hands over control
+INTRO_REVEAL = 2.0           # s for the boss's extra fade to clear after the intro starts (then only fog)
 
 
 @dataclass
@@ -75,8 +89,11 @@ class Game:
         self.scene.slot_variants = pick_parts(self.rng)
         self.scene_version += 1
         self.boss = Boss(self.scene, random.Random(self.rng.random()))
-        self.player = Player(self.scene, seed=self.rng.random())
+        self.player = Player(self.scene, *READY_SPAWN, yaw=math.pi / 2, seed=self.rng.random())  # riding towards +X
+        self.ready_to = READY_TURNS
         self.camera = ThirdPersonCamera(self.player.yaw)
+        self.boss.fade = 1.0  # out of the scene until the intro
+        self.intro_time = 0.0
         self.state = READY
         self.menu_item = 0
         self.menu_cooldown = 0.0
@@ -99,10 +116,12 @@ class Game:
             self.state = MENU if self.before_missing in (FIGHT, MENU) else self.before_missing
             self.menu_item = 0
 
-        if self.state in (READY, FIGHT):
+        if self.state in (READY, INTRO, FIGHT, EXECUTE):
             self.day += dt
         if self.state == READY:
             self._ready(inp, dt)
+        elif self.state == INTRO:
+            self._intro(inp, dt)
         elif self.state == FIGHT:
             self._fight(inp, dt)
         elif self.state == MENU:
@@ -114,12 +133,49 @@ class Game:
         return self._frame()
 
     def _ready(self, inp, dt):
-        self.camera.yaw += 0.15 * dt  # slow drift around the PC while waiting
+        self.boss.idle(dt)
+        p = self.player
+        if (p.x - self.ready_to) * math.copysign(1, self.ready_to) > -5.0:
+            self.ready_to = -self.ready_to  # turn back near the end of the line
+        self._ride_to(self.ready_to, READY_SPAWN[1], READY_THROTTLE, dt)
         if inp.pressed & BTN_A:
             self.controls.calibrate()
             self.camera = ThirdPersonCamera(self.player.yaw)
-            self.state = FIGHT
-            self.hint = HINT_SECONDS
+            self.player.boost, self.intro_time = INTRO_BOOST, 0.0
+            self.state = INTRO
+
+    def _intro(self, inp, dt):
+        self.intro_time += dt
+        self.boss.idle(dt)
+        self.boss.fade = max(0.0, 1.0 - self.intro_time / INTRO_REVEAL)
+        p = self.player
+        dx, dz = FIGHT_SPAWN[0] - p.x, FIGHT_SPAWN[1] - p.z
+        left = math.hypot(dx, dz)
+        if inp.pressed & BTN_A or left <= INTRO_ARRIVE:
+            self._fight_begins()
+            return
+        # steer at the spawn while far out, then hold the heading and rein in
+        self._ride_to(*FIGHT_SPAWN, min(1.0, math.sqrt(left / INTRO_BRAKE)), dt, steer=left > INTRO_BRAKE)
+
+    def _ride_to(self, x, z, throttle, dt, steer=True):
+        """Ride the PC towards (x, z) with a made-up stick (no buttons), the camera behind it."""
+        p = self.player
+        turn = (math.atan2(x - p.x, z - p.z) - p.yaw + math.pi) % (2 * math.pi) - math.pi if steer else 0.0
+        self.camera.turn(Input(), dt)
+        # turning right lowers yaw, so a positive turn needs the stick to the left
+        p.update(Input(move_x=max(-1.0, min(1.0, -2.0 * turn)), move_y=throttle), self.camera, dt, self.boss, None, [])
+        self.camera.follow(p, dt)
+
+    def _fight_begins(self):
+        p = self.player
+        p.x, p.z = FIGHT_SPAWN
+        p.y = world.terrain_height(self.scene, p.x, p.z)
+        p.yaw = math.atan2(self.boss.x - p.x, self.boss.z - p.z)
+        p.boost, p.speed, p.standing = 1.0, 0.0, True
+        self.boss.fade = 0.0
+        self.camera = ThirdPersonCamera(p.yaw)
+        self.state = FIGHT
+        self.hint = HINT_SECONDS
 
     def _fight(self, inp, dt):
         if inp.pressed & BTN_A:
@@ -186,6 +242,15 @@ class Game:
                     self.controls.calibrate()
                 self.state = FIGHT
 
+    def music(self):
+        """(track, volume) for audio.Music: the battle theme, softer outside the fight, and the
+        victory or defeat jingle at the end of a round (python/music/)."""
+        if self.state == WIN:
+            return "jingle_victory", 1.0
+        if self.state == LOSE:
+            return "jingle_defeat", 1.0
+        return "bgm_battle", 1.0 if self.state in (INTRO, FIGHT, EXECUTE) else 0.5
+
     def rigs(self):
         """Rig blocks for this frame: boss, horse, rider (api.md §3.3)."""
         return [self.boss.rig_block()] + self.player.rigs()
@@ -200,6 +265,9 @@ class Game:
         flags = 0
         if self.state == READY:
             hud.state, hud.msg = g3d.STATE_READY, MSG_HOLD_AND_PRESS_A
+        elif self.state == INTRO:
+            hud.state, hud.msg = g3d.STATE_FIGHT, 0
+            flags |= g3d.FLAG_NO_HUD
         elif self.state == FIGHT:
             msg = self.objective()  # warnings and the finisher prompt beat the opening hint
             hud.state, hud.msg = g3d.STATE_FIGHT, msg if msg in (MSG_JUMP_OFF, MSG_FINISH) or self.hint <= 0 else MSG_HINT

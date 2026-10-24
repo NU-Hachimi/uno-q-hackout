@@ -118,6 +118,7 @@ def test_finisher_prompts_then_b_plays_it_and_wins():
     from game import EXECUTE, MSG_FINISH
     game = Game(world.make_scene(1), seed=1)
     game.step(raw(g3d.BTN_A), DT)
+    game.step(raw(g3d.BTN_A), DT)  # skip the intro
     boss, pc = game.boss, game.player
     for slot in boss.parts:
         boss.damage(slot, 99)
@@ -141,6 +142,7 @@ def test_finisher_prompts_then_b_plays_it_and_wins():
 def test_losing_all_health_loses():
     game = Game(world.make_scene(1), seed=1)
     game.step(raw(g3d.BTN_A), DT)
+    game.step(raw(g3d.BTN_A), DT)  # skip the intro
     game.player.hp = 0
     frame = game.step(raw(), DT)
     assert game.state == LOSE and frame.hud.msg == 14

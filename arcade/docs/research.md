@@ -21,7 +21,7 @@
 | GPU | Adreno 702，355–845 MHz；Mesa 26.1.6（Turnip Vulkan 1.0、freedreno GL） | 实测 |
 | 系统 | Debian 13，内核 7.0，Xorg `:0` | 实测 |
 | 外接显示 | DRM `DP-1`（USB-C DP Alt），可用于调试 | 实测 |
-| 音频 | ALSA `Arduino-Imola-HPH-LOUT`，带耳机口 | 实测 |
+| 音频 | ALSA `Arduino-Imola-HPH-LOUT`，带耳机口；由 PipeWire 管理（默认输出 Headphones，音量 0.40）。App Lab 容器挂载了宿主的 PipeWire socket，容器里 `aplay -D default` 可以直接出声；`hw:0,0` 被 PipeWire 占用 | 实测 |
 | 纯 Python 顶点变换 | 约 157k 顶点/秒（单核） | 实测 |
 
 ## 2. MCU：STM32U585

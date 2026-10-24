@@ -3,7 +3,7 @@ import math
 import g3d
 import world
 from controls import Controls
-from game import FIGHT, MENU, MISSING, READY, Game
+from game import FIGHT, FIGHT_SPAWN, INTRO, MENU, MISSING, READY, READY_SPAWN, Game
 
 DT = 0.05
 
@@ -13,7 +13,9 @@ def raw(jx=0, jy=0, held=0, pressed=0, connected=7, accel=(0, 0, 1000)):
 
 
 def started():
+    """A fight with the intro skipped (A starts it, A again skips it)."""
     game = Game(world.make_scene(1))
+    game.step(raw(pressed=g3d.BTN_A), DT)
     game.step(raw(pressed=g3d.BTN_A), DT)
     assert game.state == FIGHT
     return game
@@ -27,7 +29,53 @@ def test_ready_shows_prompt_and_a_starts():
     boss, horse, rider = frame.rigs
     assert (boss.rig_id, horse.rig_id, rider.rig_id) == (1, 3, 4) and horse.char_light and rider.char_light
     game.step(raw(pressed=g3d.BTN_A), DT)
+    assert game.state == INTRO
+
+
+def test_ready_rides_back_and_forth_beyond_the_fog_with_the_boss_hidden():
+    game = Game(world.make_scene(1))
+    xs = []
+    for _ in range(2400):  # 2 minutes: long enough to turn back at both ends
+        frame = game.step(raw(), DT)
+        p = game.player
+        xs.append(p.x)
+        assert abs(p.z - READY_SPAWN[1]) < 12.0
+        assert math.hypot(p.x - game.boss.x, p.z - game.boss.z) > 95.0
+        assert frame.rigs[0].fade == 1.0
+        behind = (game.camera.yaw - p.yaw + math.pi) % (2 * math.pi) - math.pi
+        assert abs(behind) < 1.0  # the riding camera, no orbit
+    assert not game.player.standing  # galloping, not standing still
+    assert max(xs) > 30.0 and min(xs) < -30.0
+
+
+def test_intro_rides_up_to_the_boss_then_hands_over():
+    game = Game(world.make_scene(1))
+    for _ in range(40):
+        game.step(raw(), DT)
+    game.step(raw(pressed=g3d.BTN_A), DT)
+    fades, dist = [], []
+    for _ in range(400):
+        frame = game.step(raw(jx=127, jy=-127), DT)  # the stick does nothing during the intro
+        if game.state != INTRO:
+            break
+        assert frame.flags & g3d.FLAG_NO_HUD and game.player.hp == 5
+        fades.append(frame.rigs[0].fade)
+        dist.append(math.hypot(game.player.x - game.boss.x, game.player.z - game.boss.z))
     assert game.state == FIGHT
+    assert 6.0 < len(fades) * DT < 16.0  # seconds
+    assert fades == sorted(fades, reverse=True) and fades[-1] == 0.0
+    assert dist[0] > 95.0 and dist == sorted(dist, reverse=True)  # steadily closer
+    p = game.player
+    assert (p.x, p.z) == FIGHT_SPAWN and abs(p.yaw) < 1e-9 and game.boss.state == "standing"
+
+
+def test_a_skips_the_intro():
+    game = Game(world.make_scene(1))
+    game.step(raw(pressed=g3d.BTN_A), DT)
+    game.step(raw(), DT)
+    game.step(raw(pressed=g3d.BTN_A), DT)
+    assert game.state == FIGHT and (game.player.x, game.player.z) == FIGHT_SPAWN
+    assert game.step(raw(), DT).rigs[0].fade == 0.0
 
 
 def test_stick_forward_walks_away_from_camera():
@@ -63,7 +111,7 @@ def test_menu_navigation_and_restart():
     hud = game.step(raw(jy=-120), DT).hud  # stick down -> Restart
     assert hud.state == g3d.STATE_PAUSED and hud.msg == 10
     game.step(raw(pressed=g3d.BTN_A), DT)
-    assert game.state == READY and game.player.z == -30.0
+    assert game.state == READY and (game.player.x, game.player.z) == READY_SPAWN
 
 
 def test_menu_continue_resumes():
@@ -192,3 +240,14 @@ def test_tap_during_cooldown_fires_when_it_ends():
 def test_frame_objects_fit_the_packet():
     from player import MAX_SPARKS, MAX_TRACERS
     assert 1 + MAX_TRACERS + MAX_SPARKS + 1 <= g3d.MAX_OBJ  # hook, tracers, sparks, shockwave
+
+
+def test_music_follows_the_round():
+    game = Game(world.make_scene(1))
+    assert game.music() == ("bgm_battle", 0.5)  # Ready: the theme, softer
+    game.step(raw(pressed=g3d.BTN_A), DT)
+    assert game.music() == ("bgm_battle", 1.0)  # the intro: full volume
+    game.step(raw(pressed=g3d.BTN_A), DT)  # skip it
+    game.player.hp = 0
+    game.step(raw(), DT)
+    assert game.state == "lose" and game.music() == ("jingle_defeat", 1.0)

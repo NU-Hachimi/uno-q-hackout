@@ -1,0 +1,12 @@
+{
+ "bgm_battle": {
+  "loop_start": 19.2,
+  "end": 153.6
+ },
+ "jingle_victory": {
+  "end": 9.6
+ },
+ "jingle_defeat": {
+  "end": 9.6
+ }
+}

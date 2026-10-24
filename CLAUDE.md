@@ -62,6 +62,7 @@ Other tools:
 - **Tests:** `.venv/bin/python -m pytest arcade/tests` (protocol, terrain, rigs, scenery, boss, hook, game state machine). `tests/conftest.py` puts `python/` on `sys.path`, as on the board. If `.venv` is missing, create it with `~/miniforge3/bin/python3 -m venv .venv && .venv/bin/pip install pytest`.
 - **Generated code:** run both generators after any asset change; `--check` on either exits 1 if its outputs are stale.
   - `python3 tools/mesh_build.py` turns `assets/` into `sketch/gen/{meshes,palette}.h` and `python/gen/{mesh_ids,palette,looks}.py`.
+  - `python3 tools/audio_build.py` renders `assets/audio/*.mid` into `python/music/*.wav` (needs fluidsynth and `tool/sf2/TimGM6mb.sf2` from the board's `/usr/share/sounds/sf2/`). The WAVs are committed, so only run it after the music changes.
   - `python3 tools/rig_build.py` writes `sketch/gen/rig_*.h` (with attach points as `RIG_<RIG>_<POINT>`), `rigs.h`, `python/gen/rig_*.py` and `tests/golden/rig_*.json`.
 - **Rig golden check:** `sh tests/cpp/rig_golden.sh` builds `sketch/rig.cpp` with g++ and compares it with the golden poses of every rig (must stay ≤ 1 cm; it is 0.01 mm).
 - **Wi-Fi:** `tools/board-wifi.sh` joins the board to NUwave or eduroam over adb. `--forget` removes the saved login.
@@ -93,7 +94,8 @@ The link runs at **115200 baud**, roughly 11.5 KB/s, and the sketch accepts at m
    - `boss.py`: attack cycle, parts and phases.
    - `rig.py`: pose evaluation per api.md §5.1, the reference for `sketch/rig.cpp`.
    - `collide.py`: ray versus sphere and capsule, foot push-out.
-   - `game.py`: Ready → Fight ⇄ Menu → Win / Lose, and the day-cycle clock.
+   - `game.py`: Ready → Intro (the PC rides in to the boss on its own; A skips) → Fight ⇄ Menu → Win / Lose, the day-cycle clock, and `music()` (which track at what volume).
+   - `audio.py`: music through one long-running `aplay -D default` fed raw PCM by a thread (seamless loops, fades). In the App Lab container that reaches the headphone jack via the host's PipeWire socket; the raw `hw:0,0` device is busy because PipeWire holds it.
 3. The MCU latches button presses between frames (Input `buttons` bit4–7), so short taps are not lost.
 4. If no frame arrives for 1.5 s, the sketch renders its own demo orbit with "WAITING FOR PYTHON".
 

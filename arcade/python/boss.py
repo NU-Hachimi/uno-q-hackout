@@ -108,7 +108,6 @@ class Boss:
         self.hooked_for = 0.0      # s the PC has been hooked on
         self.knelt = False         # it has knelt once (both legs broken)
         self.damage_since = 0      # damage taken since it last knelt
-        self.fade = 0.0            # 0..1 sinking into the fog after the finisher
         slots = self.rig["slots"]
         self.legs = [i for i in slots_tagged(self.rig, "leg") if self.variants[i]]
         self.parts = [i for i in slots_tagged(self.rig, "phase1", "phase2") if self.variants[i]]
@@ -121,6 +120,7 @@ class Boss:
         self.broken = []   # (slot, world position, tint) broken since the game last read it, for debris
         self.shake = 0.0   # camera shake amplitude (m) from the latest event, read and cleared by the game
         self.waves = []    # spreading shockwaves: [x, y, z, radius, speed, damage]
+        self.fade = 0.0    # 0..1 extra blend into the fog (1 = not drawn), for the intro and the finisher
         self._cache = None
 
     # ---- animation -----------------------------------------------------------------------
@@ -194,6 +194,12 @@ class Boss:
         self.state, self.attack = STANDING, None
         self.timer = RECOVER + self.rng.uniform(*ATTACK_INTERVAL)
         self.play("idle")
+
+    def idle(self, dt):
+        """Breathe in place without attacking (Ready and the intro)."""
+        self.play("idle")
+        self.anim_time += dt
+        self._cache = None
 
     def _distance(self, player):
         return math.hypot(player.x - self.x, player.z - self.z)

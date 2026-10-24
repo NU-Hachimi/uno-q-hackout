@@ -4,6 +4,7 @@ import time
 
 from arduino.app_utils import App, Bridge
 
+import audio
 import g3d
 import world
 from game import Game
@@ -13,6 +14,7 @@ MAX_DT = 0.1            # s; clamp long stalls so the game does not jump
 RECONNECT_FAILURES = 10  # api.md §4: re-run hello and the scene upload
 
 link = g3d.G3D(Bridge.call)
+music = audio.Music()
 scene = world.make_scene(seed=1, look=world.TIME_OF_DAY[0])
 game = Game(scene)
 state = {"connected": False, "raw": None, "seq": 0, "last": time.monotonic(), "scene_version": None}
@@ -48,6 +50,7 @@ def loop():
             game.sky_sent = None
         except Exception as error:
             print(f"g3d scene upload failed: {error}")
+    music.play(*game.music())
     sky = game.sky_update(dt)
     if sky:
         link.set_sky(sky)
