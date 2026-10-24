@@ -88,6 +88,32 @@ static const float moose_a7_shin_br[] = {52.0000f, 0.0000f, 0.0000f, 52.0000f, 0
 static const float moose_a7_root_y[] = {-2.3000f, -2.3000f, -1.5000f, -0.4000f, 0.0000f};
 static const float* const moose_a7_tracks[] = {moose_a7_root, moose_a7_neck, nullptr, moose_a7_leg_fl, moose_a7_shin_fl, moose_a7_leg_fr, moose_a7_shin_fr, moose_a7_leg_bl, moose_a7_shin_bl, moose_a7_leg_br, moose_a7_shin_br};
 
+static const float moose_a8_root[] = {0.0000f, 0.0000f, 0.0000f, 5.0000f, 0.0000f, 0.0000f, 7.0000f, 0.0000f, 0.0000f, 7.0000f, 0.0000f, 0.0000f, 7.0000f, 0.0000f, 0.0000f, 5.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};
+static const float moose_a8_neck[] = {0.0000f, 0.0000f, 0.0000f, 12.0000f, 0.0000f, 0.0000f, 22.0000f, 0.0000f, 0.0000f, 26.0000f, 0.0000f, 0.0000f, 28.0000f, 0.0000f, 0.0000f, 28.0000f, 0.0000f, 0.0000f, 28.0000f, 0.0000f, 0.0000f};
+static const float moose_a8_head[] = {0.0000f, 0.0000f, 0.0000f, 8.0000f, 0.0000f, 0.0000f, 14.0000f, 0.0000f, 0.0000f, 16.0000f, 0.0000f, 0.0000f, 18.0000f, 0.0000f, 0.0000f, 18.0000f, 0.0000f, 0.0000f, 18.0000f, 0.0000f, 0.0000f};
+static const float moose_a8_leg_fr[] = {0.0000f, 0.0000f, 0.0000f, -35.0000f, 0.0000f, 0.0000f, 5.0000f, 0.0000f, 0.0000f, -35.0000f, 0.0000f, 0.0000f, 5.0000f, 0.0000f, 0.0000f, -10.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};
+static const float moose_a8_shin_fr[] = {0.0000f, 0.0000f, 0.0000f, 70.0000f, 0.0000f, 0.0000f, 10.0000f, 0.0000f, 0.0000f, 70.0000f, 0.0000f, 0.0000f, 10.0000f, 0.0000f, 0.0000f, 20.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};
+static const float moose_a8_leg_bl[] = {0.0000f, 0.0000f, 0.0000f, -8.0000f, 0.0000f, 0.0000f, -10.0000f, 0.0000f, 0.0000f, -10.0000f, 0.0000f, 0.0000f, -10.0000f, 0.0000f, 0.0000f, -8.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};
+static const float moose_a8_shin_bl[] = {0.0000f, 0.0000f, 0.0000f, 10.0000f, 0.0000f, 0.0000f, 14.0000f, 0.0000f, 0.0000f, 14.0000f, 0.0000f, 0.0000f, 14.0000f, 0.0000f, 0.0000f, 10.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};
+static const float moose_a8_leg_br[] = {0.0000f, 0.0000f, 0.0000f, -8.0000f, 0.0000f, 0.0000f, -10.0000f, 0.0000f, 0.0000f, -10.0000f, 0.0000f, 0.0000f, -10.0000f, 0.0000f, 0.0000f, -8.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};
+static const float moose_a8_shin_br[] = {0.0000f, 0.0000f, 0.0000f, 10.0000f, 0.0000f, 0.0000f, 14.0000f, 0.0000f, 0.0000f, 14.0000f, 0.0000f, 0.0000f, 14.0000f, 0.0000f, 0.0000f, 10.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};
+static const float moose_a8_root_y[] = {0.0000f, -0.1500f, -0.2500f, -0.2500f, -0.2500f, -0.2000f, 0.0000f};
+static const float* const moose_a8_tracks[] = {moose_a8_root, moose_a8_neck, moose_a8_head, nullptr, nullptr, moose_a8_leg_fr, moose_a8_shin_fr, moose_a8_leg_bl, moose_a8_shin_bl, moose_a8_leg_br, moose_a8_shin_br};
+
+static const float moose_a9_root[] = {0.0000f, 0.0000f, 0.0000f, 3.5000f, 0.0000f, 0.0000f, 5.0000f, 0.0000f, 0.0000f, 3.5000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, -3.5000f, 0.0000f, 0.0000f, -5.0000f, 0.0000f, 0.0000f, -3.5000f, 0.0000f, 0.0000f};
+static const float moose_a9_neck[] = {28.0000f, 0.0000f, 0.0000f, 30.1000f, 0.0000f, 0.0000f, 31.0000f, 0.0000f, 0.0000f, 30.1000f, 0.0000f, 0.0000f, 28.0000f, 0.0000f, 0.0000f, 25.9000f, 0.0000f, 0.0000f, 25.0000f, 0.0000f, 0.0000f, 25.9000f, 0.0000f, 0.0000f};
+static const float moose_a9_head[] = {18.0000f, 0.0000f, 0.0000f, 18.0000f, 0.0000f, 0.0000f, 18.0000f, 0.0000f, 0.0000f, 18.0000f, 0.0000f, 0.0000f, 18.0000f, 0.0000f, 0.0000f, 18.0000f, 0.0000f, 0.0000f, 18.0000f, 0.0000f, 0.0000f, 18.0000f, 0.0000f, 0.0000f};
+static const float moose_a9_leg_fl[] = {-34.0000f, 0.0000f, 0.0000f, -25.2000f, 0.0000f, 0.0000f, -4.0000f, 0.0000f, 0.0000f, 17.2000f, 0.0000f, 0.0000f, 26.0000f, 0.0000f, 0.0000f, 17.2000f, 0.0000f, 0.0000f, -4.0000f, 0.0000f, 0.0000f, -25.2000f, 0.0000f, 0.0000f};
+static const float moose_a9_shin_fl[] = {0.0000f, 0.0000f, 0.0000f, 38.9000f, 0.0000f, 0.0000f, 55.0000f, 0.0000f, 0.0000f, 38.9000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};
+static const float moose_a9_leg_fr[] = {-31.9000f, 0.0000f, 0.0000f, -15.9000f, 0.0000f, 0.0000f, 7.0000f, 0.0000f, 0.0000f, 23.5000f, 0.0000f, 0.0000f, 23.9000f, 0.0000f, 0.0000f, 7.9000f, 0.0000f, 0.0000f, -15.0000f, 0.0000f, 0.0000f, -31.5000f, 0.0000f, 0.0000f};
+static const float moose_a9_shin_fr[] = {20.2000f, 0.0000f, 0.0000f, 50.5000f, 0.0000f, 0.0000f, 51.1000f, 0.0000f, 0.0000f, 21.8000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f};
+static const float moose_a9_leg_bl[] = {34.0000f, 0.0000f, 0.0000f, 25.2000f, 0.0000f, 0.0000f, 4.0000f, 0.0000f, 0.0000f, -17.2000f, 0.0000f, 0.0000f, -26.0000f, 0.0000f, 0.0000f, -17.2000f, 0.0000f, 0.0000f, 4.0000f, 0.0000f, 0.0000f, 25.2000f, 0.0000f, 0.0000f};
+static const float moose_a9_shin_bl[] = {0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 28.3000f, 0.0000f, 0.0000f, 40.0000f, 0.0000f, 0.0000f, 28.3000f, 0.0000f, 0.0000f};
+static const float moose_a9_leg_br[] = {31.9000f, 0.0000f, 0.0000f, 15.9000f, 0.0000f, 0.0000f, -7.0000f, 0.0000f, 0.0000f, -23.5000f, 0.0000f, 0.0000f, -23.9000f, 0.0000f, 0.0000f, -7.9000f, 0.0000f, 0.0000f, 15.0000f, 0.0000f, 0.0000f, 31.5000f, 0.0000f, 0.0000f};
+static const float moose_a9_shin_br[] = {0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 0.0000f, 14.7000f, 0.0000f, 0.0000f, 36.7000f, 0.0000f, 0.0000f, 37.2000f, 0.0000f, 0.0000f, 15.9000f, 0.0000f, 0.0000f};
+static const float moose_a9_root_y[] = {0.0000f, 0.1800f, 0.2500f, 0.1800f, 0.0000f, -0.1800f, -0.2500f, -0.1800f};
+static const float* const moose_a9_tracks[] = {moose_a9_root, moose_a9_neck, moose_a9_head, moose_a9_leg_fl, moose_a9_shin_fl, moose_a9_leg_fr, moose_a9_shin_fr, moose_a9_leg_bl, moose_a9_shin_bl, moose_a9_leg_br, moose_a9_shin_br};
+
 static const RigBone moose_bones[] = {
     {-1, {0.0000f, 6.0000f, 0.0000f}, 16},  // root
     {0, {0.0000f, 1.0000f, 3.8000f}, 17},  // neck
@@ -110,6 +136,8 @@ static const RigAnim moose_anims[] = {
     {0, 8, moose_a5_root_y, moose_a5_tracks},  // shake
     {0, 5, moose_a6_root_y, moose_a6_tracks},  // kneel
     {0, 5, moose_a7_root_y, moose_a7_tracks},  // rise
+    {0, 7, moose_a8_root_y, moose_a8_tracks},  // paw
+    {1, 8, moose_a9_root_y, moose_a9_tracks},  // charge
 };
 static const RigSlot moose_slots[] = {
     {3, {0.0000f, -1.3000f, 0.5500f}, {0.0000f, 0.0000f, 0.0000f}, 3, {255, 22, 23, 255}},  // leg_fl phase1/leg
@@ -125,6 +153,6 @@ static const RigAttach moose_attach[] = {
     {2, {0.0000f, 0.9500f, 0.3000f}},  // head_weak
 };
 constexpr uint8_t RIG_MOOSE_HEAD_WEAK = 0;  // attach index
-static const Rig RIG_MOOSE = {11, moose_bones, 8, moose_anims, 8, moose_slots, 1, moose_attach};
+static const Rig RIG_MOOSE = {11, moose_bones, 10, moose_anims, 8, moose_slots, 1, moose_attach};
 
 }  // namespace gen

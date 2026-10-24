@@ -33,7 +33,7 @@ def make_boss(seed=1):
 
 def test_stands_still_until_it_attacks():
     scene, boss = make_boss()
-    pc = Player(scene, x=20.0, z=0.0)  # to the side, 20 m: outside attack range
+    pc = Player(scene, x=40.0, z=0.0)  # to the side, 40 m: outside attack and charge range
     yaw = boss.yaw
     for _ in range(200):
         boss.update(0.05, pc)
@@ -220,3 +220,45 @@ def test_stomp_ring_is_drawn_growing_on_the_ground():
         scales += [o.scale for o in boss.objects()]
     assert scales and scales == sorted(scales) and scales[-1] <= 14.0
     assert all(1 <= round(s * 16) <= 255 for s in scales)
+
+
+def test_far_pc_gets_charged_after_a_paw_wind_up():
+    from boss import CHARGING, PAWING
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-25.0)  # in front, beyond kicking range
+    boss.timer = 0.0
+    states, start = [], (boss.x, boss.z)
+    for _ in range(120):
+        boss.update(0.05, pc)
+        states.append(boss.state)
+        pc.invulnerable = 0
+    assert PAWING in states and CHARGING in states
+    assert states.index(PAWING) < states.index(CHARGING)
+    assert pc.hp == 4  # run down once
+    assert math.dist(start, (boss.x, boss.z)) > 25.0  # ran through and past
+    assert boss.state in (STANDING, TURNING)
+
+
+def test_charge_heading_locks_so_a_sidestep_dodges_it():
+    from boss import CHARGING
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-25.0)
+    boss.timer = 0.0
+    while boss.state != CHARGING:
+        boss.update(0.05, pc)
+    yaw = boss.yaw
+    pc.x = 8.0  # sidestep once it has set off
+    for _ in range(60):
+        boss.update(0.05, pc)
+    assert pc.hp == 5
+    assert boss.state != CHARGING or boss.yaw == yaw
+
+
+def test_near_pc_is_not_charged():
+    from boss import CHARGING, PAWING
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-10.0)
+    boss.timer = 0.0
+    for _ in range(80):
+        boss.update(0.05, pc)
+        assert boss.state not in (PAWING, CHARGING)

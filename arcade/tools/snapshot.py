@@ -15,7 +15,7 @@ import math  # noqa: E402
 
 import g3d  # noqa: E402
 import world  # noqa: E402
-from boss import STRIKING  # noqa: E402
+from boss import CHARGING, STRIKING  # noqa: E402
 from game import Game  # noqa: E402
 
 DT = 0.05
@@ -114,6 +114,18 @@ def main():
         game.step(raw(), DT)
         steps += 1
     run("17_stomp_ring", [raw()])
+    # Mid-charge: the PC 30 m away gets run at, head down
+    game = Game(scene, seed=7)
+    game.step(raw(pressed=g3d.BTN_A, held=g3d.BTN_A), DT)  # Ready -> Fight
+    boss = game.boss
+    game.player.x, game.player.z = boss.x, boss.z - 30
+    game.player.yaw = game.camera.yaw = 0.0
+    boss.timer = 0.0
+    steps = 0
+    while not (boss.state == CHARGING and boss.charge_left < 22) and steps < 200:
+        game.step(raw(), DT)
+        steps += 1
+    run("18_charge", [raw()])
     print(f"wrote {out}/scene.bin and {seq} frames")
 
 

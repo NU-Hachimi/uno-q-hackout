@@ -2,6 +2,8 @@
 
 It stands still between attacks. To attack it turns slowly towards the PC, then kicks, sweeps or rears up and
 stomps; the stomp sends a dust ring across the ground that hurts the PC if it is on the ground when the ring passes.
+A PC keeping its distance gets charged: the boss paws the ground with its head down while still turning, then locks
+its heading and runs straight through where the PC was; its chest and forelegs hurt the PC once if they reach it.
 Breaking both leg parts makes it kneel for good (no more attacks); breaking the legs and the back
 shatters the head cover and exposes the weak point, which can only be hurt while hooked on.
 """
@@ -18,10 +20,17 @@ from gen.rigs import RIGS
 
 RIG_ID = 1
 LEG_PARTS = 2                     # leg parts fitted per round, plus the back and the head
-ANIM_SECONDS = {"idle": 4.0, "walk": 2.0, "kneel": 2.5, "punch_r": 2.4, "sweep": 2.6, "rear_stomp": 2.4}
+ANIM_SECONDS = {"idle": 4.0, "walk": 2.0, "kneel": 2.5, "punch_r": 2.4, "sweep": 2.6, "rear_stomp": 2.4, "paw": 1.4,
+                "charge": 0.5}
 
 ATTACKS = ("punch_r", "sweep", "rear_stomp")
 ATTACK_RANGE = 14.0               # m; it only starts an attack when the PC is this close
+CHARGE_RANGE = 35.0               # m; between ATTACK_RANGE and this it charges instead
+CHARGE_SPEED = 14.0               # m/s
+CHARGE_OVERRUN = 8.0              # m it keeps running past where the PC stood when the charge began
+CHARGE_HIT_AHEAD = 4.0            # m ahead of the root: its chest and forelegs, what runs the PC down
+CHARGE_HIT_R = 3.5                # m, on the ground plane (the head is far above a mounted PC)
+CHARGE_EDGE = 20.0                # m kept from the map edge; the charge stops there
 ATTACK_INTERVAL = (5.0, 8.0)      # s of standing still between attacks
 TURN_RATE = math.radians(25)      # rad/s while turning to attack
 FACING = math.radians(10)         # close enough to the PC to strike
@@ -35,6 +44,7 @@ RING_MESH_RADIUS = 1.0            # m, outer radius of shockwave_ring at scale 1
 RING_LIFT = 0.2                   # m above the ground under the boss, so terrain bumps don't swallow the ring
 
 STANDING, TURNING, STRIKING, KNEELING = "standing", "turning", "striking", "kneeling"
+PAWING, CHARGING = "pawing", "charging"
 
 
 def anim_ids(rig_data):
@@ -84,6 +94,8 @@ class Boss:
         self.state = STANDING
         self.timer = self.rng.uniform(*ATTACK_INTERVAL)
         self.attack = None
+        self.charge_left = 0.0  # m still to run in the current charge
+        self.charge_hit = False
         slots = self.rig["slots"]
         self.legs = [i for i in slots_tagged(self.rig, "leg") if self.variants[i]]
         self.parts = [i for i in slots_tagged(self.rig, "phase1", "phase2") if self.variants[i]]
@@ -120,22 +132,63 @@ class Boss:
         self.timer -= dt
         if self.state == STANDING:
             self.play("idle")
-            if self.timer <= 0 and math.hypot(player.x - self.x, player.z - self.z) <= ATTACK_RANGE:
+            if self.timer <= 0 and self._distance(player) <= CHARGE_RANGE:
                 self.state, self.timer = TURNING, MAX_TURN
         if self.state == TURNING:
-            diff = _wrap(math.atan2(player.x - self.x, player.z - self.z) - self.yaw)  # the rig's front is +Z
-            step = TURN_RATE * dt
-            self.yaw = _wrap(self.yaw + max(-step, min(step, diff)))
+            diff = self._turn(player, dt)
             self.play("walk")
             if abs(diff) <= FACING or self.timer <= 0:
-                self.state, self.attack = STRIKING, self.rng.choice(ATTACKS)
+                if self._distance(player) > ATTACK_RANGE:
+                    self.state, self.attack = PAWING, "paw"
+                else:
+                    self.state, self.attack = STRIKING, self.rng.choice(ATTACKS)
                 self.play(self.attack)
                 before = 0
+        if self.state == PAWING:
+            self._turn(player, dt)  # still tracking: the heading locks when it sets off
+            self._events(before, self.phase(), player)
+            if self.anim_time >= ANIM_SECONDS["paw"]:
+                self.state, self.attack, self.charge_hit = CHARGING, "charge", False
+                self.charge_left = self._distance(player) + CHARGE_OVERRUN
+                self.play("charge")
+        if self.state == CHARGING:
+            self._run(dt, player)
+            return
         if self.state == STRIKING:
             self._events(before, self.phase(), player)
             if self.anim_time >= ANIM_SECONDS[self.attack]:
                 self.state, self.timer, self.attack = STANDING, RECOVER + self.rng.uniform(*ATTACK_INTERVAL), None
                 self.play("idle")
+
+    def _distance(self, player):
+        return math.hypot(player.x - self.x, player.z - self.z)
+
+    def _turn(self, player, dt):
+        """Turn towards the PC at TURN_RATE; returns the angle still to go."""
+        diff = _wrap(math.atan2(player.x - self.x, player.z - self.z) - self.yaw)  # the rig's front is +Z
+        step = TURN_RATE * dt
+        self.yaw = _wrap(self.yaw + max(-step, min(step, diff)))
+        return diff
+
+    def _run(self, dt, player):
+        """Charge straight along the locked heading; running into the PC hurts it once."""
+        step = min(CHARGE_SPEED * dt, self.charge_left)
+        x, z = self.x + math.sin(self.yaw) * step, self.z + math.cos(self.yaw) * step
+        lo, hi = world.extent(self.scene, CHARGE_EDGE)
+        inside = lo <= x <= hi and lo <= z <= hi
+        if inside:
+            self.x, self.z = x, z
+            self.y = world.terrain_height(self.scene, x, z)
+            self.charge_left -= step
+            self._cache = None
+        if not self.charge_hit:
+            fx = self.x + math.sin(self.yaw) * CHARGE_HIT_AHEAD
+            fz = self.z + math.cos(self.yaw) * CHARGE_HIT_AHEAD
+            if math.hypot(player.x - fx, player.z - fz) <= CHARGE_HIT_R:
+                self.charge_hit = player.hurt(1) or self.charge_hit
+        if self.charge_left <= 0 or not inside:
+            self.state, self.timer, self.attack = STANDING, RECOVER + self.rng.uniform(*ATTACK_INTERVAL), None
+            self.play("idle")
 
     def _events(self, before, now, player):
         """Fire the animation's events whose phase was crossed this frame (api.md §5.1)."""
