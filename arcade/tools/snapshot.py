@@ -135,6 +135,63 @@ def main():
         game.step(raw(), DT)
         steps += 1
     run("18_charge", [raw()])
+
+    def run_until(name, done, inputs=None, limit=600):
+        """Step with `inputs` (default: nothing pressed) until done() holds, then save that frame."""
+        nonlocal seq
+        frame = None
+        for _ in range(limit):
+            frame = game.step(inputs() if inputs else raw(), DT)
+            if done():
+                break
+        (out / f"{name}.frame").write_bytes(frame.pack(seq))
+        seq += 1
+
+    # Boss attacks on a fresh round (same seed, so the same parts as scene.bin).
+    game = Game(scene, seed=7)
+    run("19_0_start", skip_intro)
+    boss, p = game.boss, game.player
+    p.x, p.z = 0.0, -6.0  # by the forelegs: close enough for the stomp
+    boss.timer = 0.0
+    run_until("19_1_stomp_rears", lambda: boss.attack == "rear_stomp" and boss.phase() > 120)
+    run_until("19_2_stomp_ring_close", lambda: boss.waves and boss.waves[0][3] > 7.0)
+    boss.timer = 99.0  # no ground attacks while the hook frames are taken
+    hump = boss.hook_targets()[0].centre()
+    p.x, p.z = hump[0] + 12, hump[2]  # from the side
+    for _ in range(8):  # the camera orbits with its pitch, so converge on the direction from where it ends up
+        v = game.camera.view(p, scene)
+        dx, dy, dz = hump[0] - v.x, hump[1] - v.y, hump[2] - v.z
+        game.camera.yaw = math.atan2(dx, dz)
+        game.camera.pitch = math.atan2(dy, math.hypot(dx, dz))
+    p.yaw = game.camera.yaw
+    run("20_0_hook", [raw(pressed=g3d.BTN_C)])
+    run_until("20_1_shake_warning", lambda: boss.jump_off_warning(p) and boss.phase() > 20)
+    run_until("20_2_thrown", lambda: p.airborne and p.vy < 2.0)
+    for slot in boss.legs:
+        boss.damage(slot, 99)
+    boss.broken.clear()
+    run_until("21_0_kneeling", lambda: boss.anim_time > 3.0)
+    run_until("21_1_rising", lambda: boss.state == "rising" and boss.phase() > 120, limit=400)
+
+    # The finisher: every part broken, hooked on the shoulder hump, then B.
+    import rig as rigmath  # noqa: E402
+    for slot in boss.parts:
+        boss.damage(slot, 99)
+    boss.broken.clear()
+    run_until("22_0_standing_again", lambda: boss.state == "standing", limit=400)
+    hump = boss.hook_targets()[0]
+    bones, _ = boss.poses()
+    p.hook, p.hook_bone = "hooked", hump.bone
+    p.hook_local = rigmath.transform(rigmath.inverse(bones[hump.bone]), hump.centre())
+    p.x, p.y, p.z = hump.centre()
+    run("22_1_finish_prompt", [raw()])
+    run("23_execute_leap", [raw(pressed=g3d.BTN_B)] + [raw()] * 8)
+    run_until("24_execute_windup", lambda: game.finisher.phase > 110)
+    run_until("24_execute_hit", lambda: game.finisher.frozen > 0)
+    run_until("25_execute_twist", lambda: game.finisher.phase > 180)
+    run_until("25_execute_shatter", lambda: game.finisher.after is not None and game.finisher.after > 0.15)
+    run_until("25_execute_drop", lambda: game.finisher.dropped and game.player.vy < -3)
+    run_until("26_victory", lambda: game.state == "win")
     print(f"wrote {out}/scene.bin and {seq} frames")
 
 

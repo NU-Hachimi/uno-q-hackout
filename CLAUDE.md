@@ -31,7 +31,7 @@ Desktop Python is the repo-root `.venv`. It was created from miniforge's Python 
 
 `arduino-cli` is in `~/.local/bin`, so `make build` works locally. The first build downloads the core and libraries from the `sketch.yaml` profile.
 
-Parts of the layout in `api.md` and `workflow.md` are still planned (`tools/sim.py`, `tools/font_build.py`, the shake attack, gameplay for the PC `execute` anim). Check what actually exists before assuming it.
+Parts of the layout in `api.md` and `workflow.md` are still planned (`tools/sim.py`, `tools/font_build.py`, the boss `die` anim, the `spark_orb` mesh). Check what actually exists before assuming it.
 
 **Controls follow the 操作表 in `docs/plan.md`** (settled 2026-10-24): stick x steers the horse and the camera turns with it, stick y is throttle, tilt adds look on top (rate control; riding without tilt eases the camera back behind the horse), A opens the menu (Continue / Restart / Recalibrate) and confirms, B shoots, C is the hook. There is no dodge or jump. Don't bring back stick-press dodge, hold-C lock-on or tilt-only aiming.
 

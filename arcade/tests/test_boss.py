@@ -108,16 +108,18 @@ def test_kneeling_boss_does_not_attack():
     assert boss.state == KNEELING and pc.hp == 5
 
 
-def test_weak_point_only_hurts_while_hooked():
+def test_weak_point_is_not_shot_and_the_finisher_needs_the_hook():
     scene, boss = make_boss(seed=2)
-    assert not boss.damageable(boss.weak, hooked=True)  # still covered
+    pc = Player(scene)
     for slot in boss.parts:
         boss.damage(slot, 99)
-    assert not boss.damageable(boss.weak, hooked=False)
-    assert boss.damageable(boss.weak, hooked=True)
-    boss.damage(boss.weak, 99, hooked=True)
-    assert boss.defeated()
-
+    assert boss.weak_exposed()
+    assert not boss.damageable(boss.weak, hooked=True)  # shots never break it
+    assert not boss.finish_ready(pc)
+    pc.hook = "hooked"
+    assert boss.finish_ready(pc)
+    boss.finish()
+    assert boss.defeated() and not boss.alive & (1 << boss.weak)
 
 def test_aim_assist_snaps_to_a_visible_part():
     scene, boss = make_boss(seed=5)
@@ -262,3 +264,87 @@ def test_near_pc_is_not_charged():
     for _ in range(80):
         boss.update(0.05, pc)
         assert boss.state not in (PAWING, CHARGING)
+
+
+def test_close_pc_gets_the_stomp_and_the_ring_hurts():
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-5.0)  # under the boss's chest
+    boss.timer = 0.0
+    attack, hurt_at = None, None
+    for i in range(70):  # the stomp lands at 1.6 s and its ring is gone 1.2 s later, before the next attack
+        boss.update(0.05, pc)
+        attack = attack or boss.attack
+        if pc.hp < 5 and hurt_at is None:
+            hurt_at = i
+    assert attack == "rear_stomp" and hurt_at is not None
+    assert not boss.waves  # spread out to its full radius and gone
+
+
+def test_the_ring_spares_a_hooked_pc():
+    scene, boss = make_boss()
+    pc = Player(scene, x=0.0, z=-6.0)
+    pc.hook = "hooked"
+    boss.waves = [[0.0, 0.0, 0.0, 0.0, 12.0, 1]]
+    for _ in range(40):
+        boss._spread(0.05, pc)
+    assert pc.hp == 5
+
+
+def hooked_pc(scene, boss):
+    pc = Player(scene, x=3.0, z=0.0)
+    pc.y = boss.y + 7.0
+    pc.hook = "hooked"
+    return pc
+
+
+def test_shake_then_jump_off_safely():
+    scene, boss = make_boss()
+    pc = hooked_pc(scene, boss)
+    for _ in range(int(2.5 / 0.05) + 2):
+        boss.update(0.05, pc)
+    assert boss.state == "shaking" and boss.jump_off_warning(pc)
+    pc.hook = None  # the player pressed C: let go before the throw
+    pc.airborne = True
+    for _ in range(40):
+        boss.update(0.05, pc)
+    assert pc.hp == 5
+
+
+def test_shake_throws_off_a_pc_that_holds_on():
+    scene, boss = make_boss()
+    pc = hooked_pc(scene, boss)
+    for _ in range(100):
+        boss.update(0.05, pc)
+        if pc.airborne:
+            break
+    assert pc.airborne and pc.hook is None and pc.hp == 4
+    assert pc.vx * (pc.x - boss.x) + pc.vz * (pc.z - boss.z) > 0  # flung away from the boss
+
+
+def test_kneels_then_rises_then_kneels_again_after_damage():
+    scene, boss = make_boss(seed=4)
+    pc = Player(scene, x=0.0, z=-40.0)
+    for slot in boss.legs:
+        boss.damage(slot, 99)
+    assert boss.state == KNEELING
+    for _ in range(int((2.5 + 12.0) / 0.05) + 2):
+        boss.update(0.05, pc)
+    assert boss.state == "rising" and boss.anim == boss.anims["rise"]
+    for _ in range(int(2.5 / 0.05) + 2):
+        boss.update(0.05, pc)
+    assert boss.state == STANDING
+    back = next(s for s in boss.parts if s not in boss.legs)
+    boss.damage(back, 3)
+    assert boss.state == STANDING
+    boss.damage(back, 1)
+    assert boss.state == KNEELING
+
+
+def test_kneel_camera_shake_event_fires():
+    scene, boss = make_boss()
+    for slot in boss.legs:
+        boss.damage(slot, 99)
+    pc = Player(scene, x=0.0, z=-40.0)
+    for _ in range(60):
+        boss.update(0.05, pc)
+    assert boss.shake > 0

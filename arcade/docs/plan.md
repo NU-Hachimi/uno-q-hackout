@@ -49,6 +49,7 @@ stateDiagram-v2
 
 钩锁的规则：
 
+- **挂点**：只有两个，背上的肩峰顶和额头（`boss.py` 的 `HOOK_POINTS`），准星在 6° 内会吸附到最近的一个；钩在 BOSS 身上时低头上限放宽到 40°（`tilt_config.py` 的 `HOOKED_MIN_PITCH_DEG`）。
 - **射程**：25 m。准星落在可挂点上时高亮显示（`reticle_flags.hookable`）。
 - **飞行**：钩爪飞行约 0.3 s，绳索画成一条 3D 线段；随后 PC 以约 15 m/s 被拉到挂点。
 - **挂住时**：

@@ -1,11 +1,14 @@
 """The boss: attack cycle, the parts fitted this round, their health and the phases (docs/plan.md BOSS).
 
-It stands still between attacks. To attack it turns slowly towards the PC, then kicks, sweeps or rears up and
-stomps; the stomp sends a dust ring across the ground that hurts the PC if it is on the ground when the ring passes.
-A PC keeping its distance gets charged: the boss paws the ground with its head down while still turning, then locks
-its heading and runs straight through where the PC was; its chest and forelegs hurt the PC once if they reach it.
-Breaking both leg parts makes it kneel for good (no more attacks); breaking the legs and the back
-shatters the head cover and exposes the weak point, which can only be hurt while hooked on.
+It stands still between attacks. To attack the PC on the ground it turns slowly towards it, then rears
+and stomps when the PC is close (a dust ring spreads across the ground and hurts a PC on the ground when it
+passes), or kicks or sweeps further out. A PC keeping its distance gets charged: the boss paws the ground
+with its head down while still turning, then locks its heading and runs straight through where the PC was;
+its chest and forelegs hurt the PC once if they reach it. A PC hooked on for a while gets shaken: JUMP OFF
+with C in the window, or be thrown off and hurt.
+Breaking both leg parts makes it kneel for a while, then rise; after that every few points of damage
+bring it down again. Breaking the legs and the back shatters the head cover and exposes the weak
+point, which falls to the finisher (finisher.py).
 """
 
 import math
@@ -20,30 +23,39 @@ from gen.rigs import RIGS
 
 RIG_ID = 1
 LEG_PARTS = 2                     # leg parts fitted per round, plus the back and the head
-ANIM_SECONDS = {"idle": 4.0, "walk": 2.0, "kneel": 2.5, "punch_r": 2.4, "sweep": 2.6, "rear_stomp": 2.4, "paw": 1.4,
-                "charge": 0.5}
+ANIM_SECONDS = {"idle": 4.0, "walk": 2.0, "punch_r": 2.4, "sweep": 2.6, "rear_stomp": 2.4, "shake": 4.0,
+                "kneel": 2.5, "rise": 2.5, "paw": 1.4, "charge": 0.5}
 
-ATTACKS = ("punch_r", "sweep", "rear_stomp")
+FAR_ATTACKS = ("punch_r", "sweep")
 ATTACK_RANGE = 14.0               # m; it only starts an attack when the PC is this close
+STOMP_RANGE = 7.0                 # m; closer than this (by the legs, under the belly) it rears and stomps
 CHARGE_RANGE = 35.0               # m; between ATTACK_RANGE and this it charges instead
 CHARGE_SPEED = 14.0               # m/s
 CHARGE_OVERRUN = 8.0              # m it keeps running past where the PC stood when the charge began
 CHARGE_HIT_AHEAD = 4.0            # m ahead of the root: its chest and forelegs, what runs the PC down
 CHARGE_HIT_R = 3.5                # m, on the ground plane (the head is far above a mounted PC)
 CHARGE_EDGE = 20.0                # m kept from the map edge; the charge stops there
-ATTACK_INTERVAL = (5.0, 8.0)      # s of standing still between attacks
+SHAKE_AFTER = 2.5                 # s hooked on before it shakes
+THROW_PHASE = 73                  # shake phase of the throw event; JUMP OFF is shown until then
+KNEEL_HOLD = 12.0                 # s down on its knees after the kneel animation
+KNEEL_DAMAGE = 4                  # damage after rising that brings it down again
+ATTACK_INTERVAL = (0.5, 1.5)      # s of standing still between attacks: with the turn, one attack about every 5 s
 TURN_RATE = math.radians(25)      # rad/s while turning to attack
 FACING = math.radians(10)         # close enough to the PC to strike
-MAX_TURN = 3.0                    # s; strikes anyway after turning this long
-RECOVER = 1.0                     # s standing still after an attack
+MAX_TURN = 1.5                    # s; strikes anyway after turning this long
+RECOVER = 0.5                     # s standing still after an attack
 FLASH_SECONDS = 0.1               # hit_slot flash (two frames at 20 Hz)
 FOOT_CLEARANCE = 0.3              # m added to a shin's radius on the ground
 PC_CENTRE = 0.9                   # m above the PC's feet, for hit events
 SHOCKWAVE_RADIUS = 14.0           # m; the ring stops here, so standing farther out dodges it
 RING_MESH_RADIUS = 1.0            # m, outer radius of shockwave_ring at scale 1
 RING_LIFT = 0.2                   # m above the ground under the boss, so terrain bumps don't swallow the ring
+HOOK_POINTS = (("root", (0.0, 4.0, 2.4)),   # the top of the shoulder hump, on the back (m in the bone's frame)
+               ("head", (0.0, 0.9, 1.15)))  # the brow, just in front of the stone cap
+HOOK_RADIUS = 1.0                 # m; aiming this close to a hook point hooks it
 
-STANDING, TURNING, STRIKING, KNEELING = "standing", "turning", "striking", "kneeling"
+STANDING, TURNING, STRIKING, SHAKING, KNEELING, RISING, EXECUTED = (
+    "standing", "turning", "striking", "shaking", "kneeling", "rising", "executed")
 PAWING, CHARGING = "pawing", "charging"
 
 
@@ -94,8 +106,11 @@ class Boss:
         self.state = STANDING
         self.timer = self.rng.uniform(*ATTACK_INTERVAL)
         self.attack = None
-        self.charge_left = 0.0  # m still to run in the current charge
+        self.charge_left = 0.0     # m still to run in the current charge
         self.charge_hit = False
+        self.hooked_for = 0.0      # s the PC has been hooked on
+        self.knelt = False         # it has knelt once (both legs broken)
+        self.damage_since = 0      # damage taken since it last knelt
         slots = self.rig["slots"]
         self.legs = [i for i in slots_tagged(self.rig, "leg") if self.variants[i]]
         self.parts = [i for i in slots_tagged(self.rig, "phase1", "phase2") if self.variants[i]]
@@ -108,7 +123,7 @@ class Boss:
         self.broken = []   # (slot, world position, tint) broken since the game last read it, for debris
         self.shake = 0.0   # camera shake amplitude (m) from the latest event, read and cleared by the game
         self.waves = []    # spreading shockwaves: [x, y, z, radius, speed, damage]
-        self.fade = 0.0    # 0..1 extra blend into the fog (1 = not drawn), for the intro
+        self.fade = 0.0    # 0..1 extra blend into the fog (1 = not drawn), for the intro and the finisher
         self._cache = None
 
     # ---- animation -----------------------------------------------------------------------
@@ -123,43 +138,65 @@ class Boss:
 
     # ---- behaviour ------------------------------------------------------------------------
     def update(self, dt, player):
-        before = self.phase()
+        anim, before = self.anim, self.phase()
         self.anim_time += dt
         self.hit_timer = max(0.0, self.hit_timer - dt)
         self._cache = None
         self._spread(dt, player)
-        if self.state == KNEELING:
-            return
-        self.timer -= dt
-        if self.state == STANDING:
+        self.hooked_for = self.hooked_for + dt if player.hooked else 0.0
+        if self.state == EXECUTED:  # finisher.py drives the animation; only its events still fire
+            pass
+        elif self.state == KNEELING:
+            if self.anim_time >= ANIM_SECONDS["kneel"] + KNEEL_HOLD:
+                self.state = RISING
+                self.play("rise")
+        elif self.state == RISING:
+            if self.anim_time >= ANIM_SECONDS["rise"]:
+                self._recover()
+        elif self.state in (STANDING, TURNING, PAWING) and self.hooked_for >= SHAKE_AFTER:
+            self.state, self.attack = SHAKING, "shake"
+            self.play("shake")
+        elif self.state == STANDING:
             self.play("idle")
-            if self.timer <= 0 and self._distance(player) <= CHARGE_RANGE:
+            self.timer -= dt
+            if self.timer <= 0 and player.mounted and self._distance(player) <= CHARGE_RANGE:
                 self.state, self.timer = TURNING, MAX_TURN
-        if self.state == TURNING:
+        elif self.state == TURNING:
+            self.timer -= dt
             diff = self._turn(player, dt)
             self.play("walk")
             if abs(diff) <= FACING or self.timer <= 0:
-                if self._distance(player) > ATTACK_RANGE:
-                    self.state, self.attack = PAWING, "paw"
-                else:
-                    self.state, self.attack = STRIKING, self.rng.choice(ATTACKS)
-                self.play(self.attack)
-                before = 0
-        if self.state == PAWING:
+                self._choose(player)
+        elif self.state == PAWING:
             self._turn(player, dt)  # still tracking: the heading locks when it sets off
-            self._events(before, self.phase(), player)
             if self.anim_time >= ANIM_SECONDS["paw"]:
-                self.state, self.attack, self.charge_hit = CHARGING, "charge", False
-                self.charge_left = self._distance(player) + CHARGE_OVERRUN
-                self.play("charge")
-        if self.state == CHARGING:
+                if player.mounted:
+                    self.state, self.attack, self.charge_hit = CHARGING, "charge", False
+                    self.charge_left = self._distance(player) + CHARGE_OVERRUN
+                    self.play("charge")
+                else:  # hooked on or falling: nothing to run down
+                    self._recover()
+        elif self.state == CHARGING:
             self._run(dt, player)
-            return
-        if self.state == STRIKING:
-            self._events(before, self.phase(), player)
-            if self.anim_time >= ANIM_SECONDS[self.attack]:
-                self.state, self.timer, self.attack = STANDING, RECOVER + self.rng.uniform(*ATTACK_INTERVAL), None
-                self.play("idle")
+        elif self.state in (STRIKING, SHAKING) and self.anim_time >= ANIM_SECONDS[self.attack]:
+            self._recover()
+        # Events of whatever animation is playing; a new animation starts its phase from 0.
+        self._events(before if self.anim == anim else 0, self.phase(), player)
+
+    def _choose(self, player):
+        """Pick the attack by distance: stomp up close, kick or sweep further out, charge from afar."""
+        d = self._distance(player)
+        if d > ATTACK_RANGE:
+            self.state, self.attack = PAWING, "paw"
+        else:
+            self.state = STRIKING
+            self.attack = "rear_stomp" if d <= STOMP_RANGE else self.rng.choice(FAR_ATTACKS)
+        self.play(self.attack)
+
+    def _recover(self):
+        self.state, self.attack = STANDING, None
+        self.timer = RECOVER + self.rng.uniform(*ATTACK_INTERVAL)
+        self.play("idle")
 
     def idle(self, dt):
         """Breathe in place without attacking (Ready and the intro)."""
@@ -194,8 +231,7 @@ class Boss:
             if math.hypot(player.x - fx, player.z - fz) <= CHARGE_HIT_R:
                 self.charge_hit = player.hurt(1) or self.charge_hit
         if self.charge_left <= 0 or not inside:
-            self.state, self.timer, self.attack = STANDING, RECOVER + self.rng.uniform(*ATTACK_INTERVAL), None
-            self.play("idle")
+            self._recover()
 
     def _events(self, before, now, player):
         """Fire the animation's events whose phase was crossed this frame (api.md §5.1)."""
@@ -203,17 +239,22 @@ class Boss:
         for event in anim.get("events", []):
             if not before < event["phase"] <= now:
                 continue
-            if event["type"] == "hit":
+            kind = event["type"]
+            if kind == "hit" and player.mounted:
                 bones, _ = self.poses()
                 p = rig.transform(bones[event["bone_index"]], (0, 0, 0))
                 if math.dist(p, (player.x, player.y + PC_CENTRE, player.z)) <= event["r"]:
                     player.hurt(event.get("dmg", 1))
-            elif event["type"] == "shockwave":
+            elif kind == "shockwave":
                 bones, _ = self.poses()
                 x, _, z = rig.transform(bones[event["bone_index"]], (0, 0, 0))
                 self.waves.append([x, world.terrain_height(self.scene, x, z), z, 0.0, event["speed"],
                                    event.get("dmg", 1)])
-            elif event["type"] == "cam_shake":
+            elif kind == "throw" and player.on_boss:
+                dx, dz = player.x - self.x, player.z - self.z
+                dist = math.hypot(dx, dz) or 1.0
+                player.thrown((dx / dist, dz / dist), event.get("dmg", 1))
+            elif kind == "cam_shake":
                 self.shake = max(self.shake, event.get("amp", 0.3))
 
     def _spread(self, dt, player):
@@ -230,6 +271,10 @@ class Boss:
         return [g3d.Obj(mesh_ids.SHOCKWAVE_RING, x, y + RING_LIFT, z, scale=max(r, 0.1) / RING_MESH_RADIUS, tint=palette.DUST)
                 for x, y, z, r, _, _ in self.waves]
 
+    def jump_off_warning(self, player):
+        """True while a shake is coming and the PC can still let go safely."""
+        return self.state == SHAKING and player.hooked and self.phase() < THROW_PHASE
+
     # ---- geometry ---------------------------------------------------------------------------
     def poses(self):
         """(bone world transforms, slot world transforms) this frame, cached until update()."""
@@ -242,6 +287,18 @@ class Boss:
     def colliders(self):
         bones, slots = self.poses()
         return collide.boss_colliders(self.rig, bones, slots, self.alive, self.variants)
+
+    def hook_targets(self):
+        """The only places the hook catches, the back and the brow, as spheres around each point
+        (the rig's hookable flags are not used)."""
+        bones, _ = self.poses()
+        names = [b["name"] for b in self.rig["bones"]]
+        out = []
+        for name, point in HOOK_POINTS:
+            bone = names.index(name)
+            p = rig.transform(bones[bone], point)
+            out.append(collide.Collider("hook", "sphere", p, p, HOOK_RADIUS, bone, hookable=True))
+        return out
 
     def feet(self):
         """Ground circles (x, z, r) the PC cannot enter: the lower ends of the shins."""
@@ -260,31 +317,54 @@ class Boss:
     def damageable(self, slot, hooked=False):
         if not self.alive & (1 << slot) or slot not in self.hp:
             return False
-        if slot == self.weak:
-            return self.weak_exposed() and hooked
-        return True
+        return slot != self.weak  # the weak point falls to the finisher, not to shots
 
     def damage(self, slot, amount, hooked=False):
         """Apply a hit; returns True when it broke the part."""
         if not self.damageable(slot, hooked):
             return False
-        self.hp[slot] = max(0, self.hp[slot] - amount)
+        dealt = min(self.hp[slot], amount)
+        self.hp[slot] -= dealt
         self.hit_slot, self.hit_timer = slot, FLASH_SECONDS
-        if self.hp[slot] > 0:
-            return False
-        self._break(slot)
-        if self.state != KNEELING and all(self.hp[s] == 0 for s in self.legs):
-            self.state, self.attack = KNEELING, None
-            self.play("kneel")
-        if all(self.hp[s] == 0 for s in self.parts) and self.alive & (1 << self.cover):
-            self._break(self.cover)  # the stone cap shatters and the weak point shows
-        return True
+        broke = self.hp[slot] == 0
+        if broke:
+            self._break(slot)
+            if all(self.hp[s] == 0 for s in self.parts) and self.alive & (1 << self.cover):
+                self._break(self.cover)  # the stone cap shatters and the weak point shows
+        if self.state not in (KNEELING, RISING):
+            if not self.knelt and all(self.hp[s] == 0 for s in self.legs):
+                self.knelt = True
+                self._kneel()
+            elif self.knelt:
+                self.damage_since += dealt
+                if self.damage_since >= KNEEL_DAMAGE:
+                    self._kneel()
+        return broke
+
+    def _kneel(self):
+        self.state, self.attack, self.damage_since = KNEELING, None, 0
+        self.play("kneel")
 
     def _break(self, slot):
         self.alive &= ~(1 << slot)
         _, slots = self.poses()
         mesh = self.rig["slots"][slot]["variants"][self.variants[slot]] or ""
         self.broken.append((slot, rig.transform(slots[slot], (0, 0, 0)), part_tint(mesh)))
+
+    def begin_execution(self):
+        """The finisher starts: stop attacking and drop pending shockwaves."""
+        self.state, self.attack, self.waves = EXECUTED, None, []
+
+    def finish(self):
+        """The finisher breaks the weak point."""
+        if self.hp.get(self.weak):
+            self.hp[self.weak] = 0
+            self._break(self.weak)
+
+    def finish_ready(self, player):
+        """FINISH HIM: every part is gone, the weak point is bare and the PC is hooked on."""
+        return (self.weak_exposed() and self.hp.get(self.weak, 0) > 0 and player.hooked
+                and self.state not in (SHAKING, EXECUTED))
 
     def weak_exposed(self):
         return not self.alive & (1 << self.cover)

@@ -237,6 +237,11 @@ def test_tap_during_cooldown_fires_when_it_ends():
     assert game.player.shots == 2
 
 
+def test_frame_objects_fit_the_packet():
+    from player import MAX_SPARKS, MAX_TRACERS
+    assert 1 + MAX_TRACERS + MAX_SPARKS + 1 <= g3d.MAX_OBJ  # hook, tracers, sparks, shockwave
+
+
 def test_music_follows_the_round():
     game = Game(world.make_scene(1))
     assert game.music() == ("bgm_battle", 0.5)  # Ready: the theme, softer

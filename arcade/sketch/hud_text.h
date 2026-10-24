@@ -25,6 +25,8 @@ static const char* const MESSAGES[] = {
     "STICK MOVE  TILT LOOK  B SHOOT  A MENU",  // 15
     "WAITING FOR PYTHON",                   // 16
     "BREAK THE CRYSTALS",                   // 17
+    "JUMP OFF! (C)",                        // 18
+    "FINISH HIM (B)",                       // 19
 };
 constexpr int MESSAGE_COUNT = sizeof(MESSAGES) / sizeof(MESSAGES[0]);
 

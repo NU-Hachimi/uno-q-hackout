@@ -13,15 +13,18 @@ import g3d
 import world
 from boss import Boss, pick_parts
 from camera import ThirdPersonCamera
-from controls import BTN_A, Controls, Input
+from controls import BTN_A, BTN_B, Controls, Input
+from finisher import Finisher
 from player import HP_MAX, Player
 
-READY, INTRO, FIGHT, MENU, MISSING, WIN, LOSE = "ready", "intro", "fight", "menu", "missing", "win", "lose"
+READY, INTRO, FIGHT, MENU, MISSING, WIN, LOSE, EXECUTE = (
+    "ready", "intro", "fight", "menu", "missing", "win", "lose", "execute")
 
 MSG_ARMOR = 2            # objective messages (api.md §3.5)
 MSG_HOOK_ON = 3
-MSG_STRIKE_HEAD = 4
 MSG_CRYSTALS = 17
+MSG_JUMP_OFF = 18
+MSG_FINISH = 19
 MSG_MISSING = 8
 MSG_MENU = (9, 10, 11)   # Continue, Restart, Recalibrate
 MSG_HOLD_AND_PRESS_A = 12
@@ -98,6 +101,7 @@ class Game:
         self.before_missing = READY
         self.time = 0.0
         self.aim = None
+        self.finisher = None
         self.shake, self.shake_time = 0.0, 0.0
 
     def step(self, raw, dt):
@@ -112,7 +116,7 @@ class Game:
             self.state = MENU if self.before_missing in (FIGHT, MENU) else self.before_missing
             self.menu_item = 0
 
-        if self.state in (READY, INTRO, FIGHT):
+        if self.state in (READY, INTRO, FIGHT, EXECUTE):
             self.day += dt
         if self.state == READY:
             self._ready(inp, dt)
@@ -122,6 +126,8 @@ class Game:
             self._fight(inp, dt)
         elif self.state == MENU:
             self._menu(inp, dt)
+        elif self.state == EXECUTE:
+            self._execute(dt)
         elif self.state in (WIN, LOSE) and inp.pressed & BTN_A:
             self.restart()
         return self._frame()
@@ -177,25 +183,41 @@ class Game:
             return
         self.hint = max(0.0, self.hint - dt)
         self.shake_time = max(0.0, self.shake_time - dt)
-        self.camera.turn(inp, dt)
+        self.camera.turn(inp, dt, self.player.on_boss)
         self.boss.update(dt, self.player)
         if self.boss.shake:
             self.shake, self.shake_time, self.boss.shake = self.boss.shake, SHAKE_SECONDS, 0.0
+        if self.boss.finish_ready(self.player) and (inp.pressed | inp.held) & BTN_B:
+            self.finisher, self.state = Finisher(self), EXECUTE  # B finishes instead of shooting
+            return
         colliders = self.boss.colliders()
-        self.aim = aiming.compute(self.camera.view(self.player, self.scene), colliders, self.player.hand())
+        self.aim = aiming.compute(self.camera.view(self.player, self.scene), colliders, self.player.hand(),
+                                  self.boss.hook_targets())
         self.player.update(inp, self.camera, dt, self.boss, self.aim, colliders)
         self.camera.follow(self.player, dt)
         for _, pos, tint in self.boss.broken:
             self.player.debris(pos, tint)
         self.boss.broken.clear()
-        if self.boss.defeated():
-            self.state = WIN
-        elif self.player.hp <= 0:
+        if self.player.hp <= 0:
             self.state = LOSE
+
+    def _execute(self, dt):
+        """The finisher cutscene (finisher.py); no input until the victory screen."""
+        self.shake_time = max(0.0, self.shake_time - dt)
+        done = self.finisher.update(dt)
+        if self.boss.shake:
+            self.shake, self.shake_time, self.boss.shake = self.boss.shake, SHAKE_SECONDS, 0.0
+        for _, pos, tint in self.boss.broken:
+            self.player.debris(pos, tint)
+        self.boss.broken.clear()
+        if done:
+            self.state = WIN
 
     def objective(self):
         """The message for what to do next (legs, then the back, then the head)."""
         boss, hooked = self.boss, self.player.hooked
+        if boss.jump_off_warning(self.player):
+            return MSG_JUMP_OFF
         remaining = {s for s in boss.parts if boss.hp[s] > 0}
         if remaining & set(boss.legs):
             return MSG_ARMOR
@@ -204,7 +226,7 @@ class Game:
                 return MSG_HOOK_ON
             kinds = boss.remaining_kinds()
             return MSG_ARMOR if any(k.startswith("armor") for k in kinds) else MSG_CRYSTALS
-        return MSG_STRIKE_HEAD if hooked else MSG_HOOK_ON
+        return MSG_FINISH if boss.finish_ready(self.player) else MSG_HOOK_ON
 
     def _menu(self, inp, dt):
         self.menu_cooldown = max(0.0, self.menu_cooldown - dt)
@@ -229,14 +251,14 @@ class Game:
             return "jingle_victory", 1.0
         if self.state == LOSE:
             return "jingle_defeat", 1.0
-        return "bgm_battle", 1.0 if self.state in (INTRO, FIGHT) else 0.5
+        return "bgm_battle", 1.0 if self.state in (INTRO, FIGHT, EXECUTE) else 0.5
 
     def rigs(self):
         """Rig blocks for this frame: boss, horse, rider (api.md §3.3)."""
         return [self.boss.rig_block()] + self.player.rigs()
 
     def _frame(self):
-        view = self.camera.view(self.player, self.scene)
+        view = self.finisher.view() if self.state == EXECUTE else self.camera.view(self.player, self.scene)
         if self.shake_time > 0:
             fade = self.shake_time / SHAKE_SECONDS
             view.y += self.shake * fade * math.sin(self.time * 2 * math.pi * SHAKE_HZ)
@@ -249,11 +271,14 @@ class Game:
             hud.state, hud.msg = g3d.STATE_FIGHT, 0
             flags |= g3d.FLAG_NO_HUD
         elif self.state == FIGHT:
-            hud.state, hud.msg = g3d.STATE_FIGHT, MSG_HINT if self.hint > 0 else self.objective()
+            msg = self.objective()  # warnings and the finisher prompt beat the opening hint
+            hud.state, hud.msg = g3d.STATE_FIGHT, msg if msg in (MSG_JUMP_OFF, MSG_FINISH) or self.hint <= 0 else MSG_HINT
             if self.aim:
                 hud.reticle_dx, hud.reticle_dy, hud.reticle_flags = self.aim.dx, self.aim.dy, self.aim.flags
             if self.player.hurt_flash > 0:
                 flags |= g3d.FLAG_HURT
+        elif self.state == EXECUTE:
+            hud.state, flags = g3d.STATE_FIGHT, flags | g3d.FLAG_NO_HUD  # a clean cutscene
         elif self.state == MENU:
             hud.state, hud.msg = g3d.STATE_PAUSED, MSG_MENU[self.menu_item]
         elif self.state == WIN:
@@ -263,4 +288,7 @@ class Game:
         else:
             hud.state, hud.msg = g3d.STATE_PAUSED, MSG_MISSING
         objects = self.boss.objects() + self.player.objects()  # rings first: MAX_OBJ cuts the tail
-        return Frame(view, objects, hud, self.rigs(), self.player.hook_block(), flags)
+        hook = self.player.hook_block()
+        if self.state == EXECUTE:  # the hook is in the rider's hand, not on a rope
+            objects, hook = (self.finisher.objects() + self.player.objects())[:g3d.MAX_OBJ], g3d.Hook()
+        return Frame(view, objects, hud, self.rigs(), hook, flags)
