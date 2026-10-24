@@ -11,6 +11,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python"))
 
+import math  # noqa: E402
+
 import g3d  # noqa: E402
 import world  # noqa: E402
 from game import Game  # noqa: E402
@@ -36,8 +38,8 @@ def main():
     out = Path(sys.argv[1])
     out.mkdir(parents=True, exist_ok=True)
     scene = world.make_scene(seed=1)
+    game = Game(scene, seed=7)  # picks this round's parts into scene.slot_variants
     write_scene(out / "scene.bin", scene)
-    game = Game(scene)
     seq = 0
 
     def run(name, inputs):
@@ -45,8 +47,7 @@ def main():
         frame = None
         for r in inputs:
             frame = game.step(r, DT)
-        cam, objs, hud, flags = frame
-        (out / f"{name}.frame").write_bytes(g3d.pack_frame(seq, cam, objs, hud, rigs=game.rigs(), flags=flags))
+        (out / f"{name}.frame").write_bytes(frame.pack(seq))
         seq += 1
 
     run("1_ready", [raw()])
@@ -58,13 +59,48 @@ def main():
     run("3_walk_shoot", walk + shoot)
     run("4_menu", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A), raw(jy=-110)])
     run("5_missing", [raw(connected=5)])
-    # The day cycle at 8 points (holds and blends); NAME.sky next to NAME.frame is a g3d_scene_sky payload.
-    game = Game(scene)
-    run("6_ride", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A)] + [raw(jx=-30, jy=100)] * 20 + [raw(held=g3d.BTN_B)] * 3)
+    run("6_menu_continue", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A)])  # back to the fight
+
+    def look_at(point, distance):
+        """Stand `distance` from a point on the ground, facing it, with the camera on it."""
+        p = game.player
+        dx, dz = point[0] - p.x, point[2] - p.z
+        heading = math.atan2(dx, dz)
+        p.x, p.z = point[0] - math.sin(heading) * distance, point[2] - math.cos(heading) * distance
+        game.camera.yaw = heading
+        game.camera.pitch = math.atan2(point[1] - (p.y + 2.5), distance + 6)
+
+    boss = game.boss
+    part = boss.parts[0]
+    centre = next(c for c in boss.colliders() if c.slot == part).centre()
+    look_at(centre, 14)
+    run("7_aim_part", [raw()])
+    part = game.aim.target.slot if game.aim.target else part  # the part the reticle snapped to
+    run("8_shoot_part", [raw(pressed=g3d.BTN_B), raw()])  # one shot: the tracer on its way
+    while boss.hp[part] > 1:
+        boss.damage(part, 1)
+    boss.hit_timer = 0
+    run("9_break_part", [raw(pressed=g3d.BTN_B)] + [raw()] * 5)
+    for slot in boss.parts:
+        boss.damage(slot, 99)
+    game.boss.broken.clear()
+    look_at((boss.x, boss.y + 5, boss.z), 22)
+    run("10_kneel", [raw()] * 60)
+    hump = next(c for c in boss.colliders() if c.hookable).centre()
+    look_at(hump, 12)
+    run("11_hook_aim", [raw()])
+    run("12_hook_flying", [raw(pressed=g3d.BTN_C), raw(), raw()])
+    run("13_hooked", [raw()] * 30)
+    boss.damage(boss.weak, 99, hooked=True)
+    run("14_victory", [raw()])
+    # The day cycle at 8 points (holds and blends) on a fresh round; NAME.sky next to NAME.frame is a
+    # g3d_scene_sky payload that render_preview.sh applies after the scene.
+    game = Game(scene, seed=7)
+    run("15_ride", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A)] + [raw(jx=-30, jy=100)] * 20 + [raw(held=g3d.BTN_B)] * 3)
     period = world.DAY_HOLD + world.DAY_BLEND
     for k in range(8):
         t = (k // 2) * period + (world.DAY_HOLD / 2 if k % 2 == 0 else world.DAY_HOLD + world.DAY_BLEND / 2)
-        name = f"7_{k}_day_{t:04.0f}s"
+        name = f"16_{k}_day_{t:04.0f}s"
         (out / f"{name}.sky").write_bytes(g3d.pack_sky(*world.sky_at(t)))
         run(name, [raw()])
     print(f"wrote {out}/scene.bin and {seq} frames")

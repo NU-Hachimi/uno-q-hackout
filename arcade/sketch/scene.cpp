@@ -5,7 +5,6 @@
 
 #include "g3d_proto.h"
 #include "gen/meshes.h"
-#include "gen/rigs.h"
 
 namespace scene {
 
@@ -14,9 +13,11 @@ int8_t heights[MAX_N * MAX_N];
 uint16_t palette[32];
 Rock rocks[MAX_ROCKS];
 int nRocks = 0;
-uint8_t bossRig = 0;
-uint8_t slotVariant[32];
-int nSlots = 0;
+
+namespace {
+uint8_t liveRig = 0;
+uint8_t liveVariants[32];
+}  // namespace
 
 namespace {
 
@@ -36,10 +37,9 @@ struct Staging {
   int8_t heights[MAX_N * MAX_N];
   uint8_t rocks[MAX_ROCKS * 8];
   int nRocks;
-  uint8_t rigId, slotVariant[32];
-  int nSlots;
   uint32_t terrainChunks, rockChunks;  // bit per received chunk index
   uint8_t lookRaw[LOOK_SIZE];  // kept as sent, for the CRC
+  uint8_t rig, nSlots, variants[32];
   gen::Look look;
   bool hasLook, begun, committed;
 };
@@ -129,6 +129,8 @@ void buildDemo(uint32_t seed) {
   const RawColors raw = {gen::SCENE_SKY_TOP, gen::SCENE_SKY_HORIZON, gen::SCENE_FOG_COLOR, gen::SCENE_GRASS_A,
                          gen::SCENE_GRASS_B};
   applyLook(gen::DEFAULT_LOOK, raw, params);
+  liveRig = 1;  // the moose with the first variant of every part, for the demo
+  memset(liveVariants, 1, sizeof(liveVariants));
 
   const int n = params.terrainN;
   for (int j = 0; j < n; ++j) {
@@ -160,9 +162,6 @@ void buildDemo(uint32_t seed) {
     k.scale = (k.mesh == gen::MESH_ROCK_A || k.mesh == gen::MESH_ROCK_B) ? 1.0f + 1.6f * u : 1.0f + 0.4f * v;
     k.tint = 0;
   }
-  bossRig = 1;
-  nSlots = 32;
-  for (int i = 0; i < nSlots; ++i) slotVariant[i] = 1;
 }
 
 float terrainHeight(float x, float z) {
@@ -203,9 +202,10 @@ bool uploadBegin(const uint8_t* h, size_t n) {
   if (p.terrainN < 2 || p.terrainN > MAX_N || p.cell <= 0 || p.fogFar <= p.fogNear || p.fogFar < 4 ||
       staging.nRocks > MAX_ROCKS)
     return false;
-  staging.rigId = h[1];
+  staging.rig = h[1];
   staging.nSlots = h[24] > 32 ? 32 : h[24];
-  memcpy(staging.slotVariant, h + 25, staging.nSlots);
+  memset(staging.variants, 0, sizeof(staging.variants));
+  memcpy(staging.variants, h + 25, staging.nSlots);
   staging.terrainChunks = staging.rockChunks = 0;
   staging.hasLook = false;
   staging.begun = true;
@@ -304,10 +304,12 @@ static bool applySceneUpload() {
     k.mesh = r[6];
     k.tint = r[7] < 32 ? r[7] : 0;
   }
-  bossRig = staging.rigId;
-  nSlots = staging.nSlots;
-  memcpy(slotVariant, staging.slotVariant, nSlots);
+  liveRig = staging.rig;
+  memcpy(liveVariants, staging.variants, sizeof(liveVariants));
   return true;
 }
+
+uint8_t rigId() { return liveRig; }
+uint8_t slotVariant(int slot) { return slot >= 0 && slot < 32 ? liveVariants[slot] : 0; }
 
 }  // namespace scene

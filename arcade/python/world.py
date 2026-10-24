@@ -6,7 +6,6 @@ import struct
 
 from g3d import SceneDef
 from gen import mesh_ids
-from gen import rigs as gen_rigs
 from gen.looks import LOOKS
 from gen.palette import SCENE_DEFAULTS
 
@@ -62,16 +61,6 @@ def scatter_rocks(seed):
     return rocks
 
 
-def boss_variants(seed):
-    """One variant per boss slot: armour/crystal chosen at random, cover and weak point always present."""
-    rng = random.Random(seed * 104729 + 11)
-    out = []
-    for slot in gen_rigs.RIGS[gen_rigs.MOOSE]["slots"]:
-        n = len(slot["variants"])
-        out.append(1 if {"cover", "weak"} & set(slot["tags"]) else rng.randrange(1, n))
-    return out
-
-
 def _lerp565(a, b, k):
     ch = [((a >> s) & m) + (((b >> s) & m) - ((a >> s) & m)) * k for s, m in ((11, 31), (5, 63), (0, 31))]
     return (round(ch[0]) << 11) | (round(ch[1]) << 5) | round(ch[2])
@@ -108,7 +97,7 @@ def sky_at(seconds):
     return blend_sky(TIME_OF_DAY[i], TIME_OF_DAY[(i + 1) % n], k)
 
 
-def make_scene(seed=1, look="forbidden_plain"):
+def make_scene(seed=1, rig_id=1, slot_variants=(), look="forbidden_plain"):
     """Rolling plain with a flat arena in the middle (the boss fight happens there), lit by `look`."""
     n, origin = TERRAIN_N, -(TERRAIN_N - 1) * CELL / 2
     heights = []
@@ -125,9 +114,8 @@ def make_scene(seed=1, look="forbidden_plain"):
         heights=heights, terrain_n=n, cell=CELL, origin_x=origin, origin_z=origin, height_scale=HEIGHT_SCALE,
         sky_top=d["sky_top"], sky_horizon=d["sky_horizon"], fog_color=d["fog_color"],
         fog_near=d["fog_near"] * 2, fog_far=d["fog_far"] * 2, grass_a=d["grass_a"], grass_b=d["grass_b"],
-        light_yaw=d["light_yaw"], light_pitch=d["light_pitch"],
-        rig_id=gen_rigs.MOOSE, slot_variants=boss_variants(seed), rocks=scatter_rocks(seed),
-        look=LOOKS[look]["block"])
+        light_yaw=d["light_yaw"], light_pitch=d["light_pitch"], rig_id=rig_id, slot_variants=list(slot_variants),
+        rocks=scatter_rocks(seed), look=LOOKS[look]["block"])
 
 
 def terrain_height(scene, x, z):

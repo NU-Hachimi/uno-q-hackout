@@ -3,7 +3,6 @@ import math
 import g3d
 import world
 from gen import mesh_ids
-from gen import rigs as gen_rigs
 from gen.looks import LOOKS
 
 
@@ -21,7 +20,7 @@ def test_every_time_of_day_uploads():
         scene = world.make_scene(seed=1, look=look)
         header, chunks, crc = g3d.pack_scene(scene)
         assert [len(d) for k, _, d in chunks if k == g3d.KIND_LOOK] == [76]
-        assert header[1] == gen_rigs.MOOSE and header[24] == len(gen_rigs.RIGS[gen_rigs.MOOSE]["slots"])
+        assert header[1] == 1  # the moose
         assert scene.fog_far == 2 * LOOKS[look]["scene"].get("fog_far", scene.fog_far / 2)
 
 

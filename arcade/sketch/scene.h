@@ -32,9 +32,6 @@ struct Rock {
 extern Params params;
 extern Rock rocks[MAX_ROCKS];
 extern int nRocks;
-extern uint8_t bossRig;          // scene header rig_id; the boss frame rig block uses its slot variants
-extern uint8_t slotVariant[32];  // variant index per slot (0 = empty)
-extern int nSlots;
 extern int8_t heights[MAX_N * MAX_N];  // row-major: heights[j * terrainN + i], i along X
 extern uint16_t palette[32];          // object palette after the Look's grading
 
@@ -50,5 +47,8 @@ bool uploadCommit(uint16_t crc);
 // touching terrain or rocks. Python sends one every fraction of a second while the time of day changes.
 bool uploadSky(const uint8_t* data, size_t n);
 bool applyUpload();  // applies a committed upload, then a pending sky update; true means re-bake
+
+uint8_t rigId();                  // boss rig of the live scene (header rig_id), 0 for none
+uint8_t slotVariant(int slot);    // fitted part variant per rig slot, 0 = empty
 
 }  // namespace scene

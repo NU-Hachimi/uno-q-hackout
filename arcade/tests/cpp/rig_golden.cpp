@@ -1,21 +1,41 @@
-// Prints every bone's rig-space origin for each rig, anim and golden phase as
-// "<rig_id> <anim> <phase> <bone> <x> <y> <z>"; rig_golden.sh compares it with tests/golden/.
+// Prints sketch/rig.cpp poses in the layout of tests/golden/rig_<name>.json, for rig_golden.sh.
 #include <stdio.h>
 
+#include "gen/rigs.h"
 #include "rig.h"
 
 int main() {
-  static const uint8_t PHASES[] = {0, 64, 128, 192};
-  rig::Xf bones[rig::MAX_BONES];
-  for (int id = 0; id < gen::RIG_COUNT; ++id) {
-    const gen::Rig& r = gen::RIGS[id];
-    for (int a = 0; a < r.nAnims; ++a) {
-      for (uint8_t phase : PHASES) {
-        const int n = rig::pose(r, a, phase, bones);
-        for (int b = 0; b < n; ++b)
-          printf("%d %d %d %d %.5f %.5f %.5f\n", id, a, phase, b, bones[b].t[0], bones[b].t[1], bones[b].t[2]);
+  static const int PHASES[] = {0, 64, 128, 192, 255};
+  const float points[4][3] = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+  printf("{\"rigs\": [");
+  bool firstRig = true;
+  for (int id = 1; id < gen::RIG_COUNT; ++id) {
+    const gen::Rig* r = rig::find(uint8_t(id));
+    if (!r) continue;  // unused id (2 is kept for the gorilla)
+    printf("%s{\"id\": %d, \"anims\": [", firstRig ? "" : ", ", id);
+    firstRig = false;
+    for (int a = 0; a < r->nAnims; ++a) {
+      printf("%s[", a ? ", " : "");
+      for (int p = 0; p < 5; ++p) {
+        rig::Xform bones[rig::MAX_BONES];
+        rig::pose(*r, uint8_t(a), uint8_t(PHASES[p]), bones);
+        printf("%s[", p ? ", " : "");
+        for (int m = 0; m < r->nBones + r->nSlots; ++m) {
+          const rig::Xform x = m < r->nBones ? bones[m] : rig::slot(*r, bones, m - r->nBones);
+          printf("%s[", m ? ", " : "");
+          for (int k = 0; k < 4; ++k) {
+            float out[3];
+            rig::apply(x, points[k], out);
+            printf("%s%.5f, %.5f, %.5f", k ? ", " : "", out[0], out[1], out[2]);
+          }
+          printf("]");
+        }
+        printf("]");
       }
+      printf("]");
     }
+    printf("]}");
   }
+  printf("]}\n");
   return 0;
 }

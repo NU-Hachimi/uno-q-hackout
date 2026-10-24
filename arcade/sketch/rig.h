@@ -2,25 +2,28 @@
 
 #include <stdint.h>
 
-#include "gen/rigs.h"
+#include "gen/rig_types.h"
 
-// Rig poses (api.md §5.1), a port of python/rig.py (the reference). Platform-independent:
-// tests/cpp/rig_golden.sh compiles it on the desktop and checks it against tests/golden/.
+// Rig pose evaluation (api.md §5.1); must match python/rig.py, checked by tests/cpp/rig_golden.sh.
+// Platform-independent and TGX-free so the golden test can build it alone.
 namespace rig {
 
 constexpr int MAX_BONES = 16;
 
-struct Xf {
-  float r[3][3];  // row-major rotation
-  float t[3];     // translation, m
+struct Xform {
+  float r[9];  // row-major rotation
+  float t[3];  // translation; maps p to r * p + t
 };
 
-Xf compose(const Xf& a, const Xf& b);                    // a · b
-void apply(const Xf& x, const float p[3], float out[3]);  // x · p
-Xf euler(const float deg[3]);                            // [rx, ry, rz] degrees: Ry · Rx · Rz
-Xf placement(float x, float y, float z, float yaw);      // T(x, y, z) · Ry(yaw), yaw in rad
+const gen::Rig* find(uint8_t rigId);  // nullptr for 0 or an unknown id
 
-// Bone transforms in rig space (origin at 0, yaw 0). Returns the bone count, or 0 for a bad rig/anim.
-int pose(const gen::Rig& rig, int anim, uint8_t phase, Xf out[MAX_BONES]);
+// Rig-space transform of every bone; false (and nothing written) for a bad rig or animation.
+bool pose(const gen::Rig& rig, uint8_t anim, uint8_t phase, Xform out[MAX_BONES]);
+
+Xform slot(const gen::Rig& rig, const Xform* bones, int slotIndex);
+Xform euler(float rxDeg, float ryDeg, float rzDeg);  // Ry * Rx * Rz
+Xform compose(const Xform& a, const Xform& b);       // a * b: b first
+Xform rigToWorld(float x, float y, float z, float yawRad);  // T(pos) * Ry(yaw)
+void apply(const Xform& m, const float p[3], float out[3]);
 
 }  // namespace rig

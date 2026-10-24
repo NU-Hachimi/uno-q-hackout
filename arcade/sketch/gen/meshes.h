@@ -318,4 +318,7 @@ static const Mesh MESHES[MESH_COUNT] = {
     {horse_shin_verts, horse_shin_tris, horse_shin_group_end, horse_shin_group_color, 13, 2, 0.4858f},  // 45
 };
 
+// Attachment points in mesh space, metres (meshes.json attach).
+constexpr float ATTACH_PC_HAND[3] = {-0.3000f, 1.0200f, 0.4500f};
+
 }  // namespace gen

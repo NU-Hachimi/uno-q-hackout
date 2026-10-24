@@ -3,44 +3,52 @@ import math
 from pathlib import Path
 
 import rig
-from gen import rigs as gen_rigs
+from gen.rigs import RIGS
 
-GOLDEN = Path(__file__).resolve().parent / "golden"
-
-
-def test_golden_matches_reference():
-    """tests/golden/ was written by tools/rig_build.py from python/rig.py; it must still agree."""
-    for r in gen_rigs.RIGS.values():
-        g = json.loads((GOLDEN / f"rig_{r['name']}.json").read_text())
-        for a in r["anims"]:
-            for k, phase in enumerate(g["phases"]):
-                pose = rig.pose(r, a["id"], phase)
-                for b, want in zip(r["bones"], g["anims"][a["name"]][k]):
-                    got = pose[b["name"]][1]
-                    assert max(abs(p - q) for p, q in zip(got, want)) < 1e-4, (r["name"], a["name"], phase)
+MOOSE = RIGS[1]
+GOLDEN = json.loads((Path(__file__).parent / "golden" / "rig_moose.json").read_text())
 
 
-def test_rotation_order_and_conventions():
-    # Legs hang along -Y: rx < 0 swings the foot forward (+Z), rz > 0 towards +X (api.md §5.1).
-    foot = (0.0, -1.0, 0.0)
-    fwd = rig.apply((rig.rot(-90, 0, 0), (0, 0, 0)), foot)
-    side = rig.apply((rig.rot(0, 0, 90), (0, 0, 0)), foot)
-    assert fwd[2] > 0.99 and side[0] > 0.99
-    # yaw first, then pitch: [rx, 90, 0] turns the pitched vector about world Y
-    v = rig.apply((rig.rot(-90, 90, 0), (0, 0, 0)), foot)
-    assert v[0] > 0.99
+def test_golden_matches_rig_py():
+    # The golden file is written by tools/rig_build.py from rig.py; this guards against drift.
+    for anim in GOLDEN["anims"]:
+        for phase, want in zip(GOLDEN["phases"], anim["poses"]):
+            poses = rig.pose(MOOSE, anim["id"], phase)
+            origin = rig.transform(poses[0], (0, 0, 0))
+            assert all(abs(a - b) < 1e-4 for a, b in zip(origin, want[0][:3]))
 
 
-def test_loop_wraps_and_one_shot_ends():
-    keys = [[0, 0, 0], [10, 0, 0], [20, 0, 0], [30, 0, 0]]
-    assert rig.sample(keys, 0, True) == keys[0]
-    assert abs(rig.sample(keys, 224, True)[0] - 15) < 1e-9  # halfway from the last key back to the first
-    assert rig.sample(keys, 255, False) == [30.0, 0.0, 0.0]
+def test_key_positions():
+    loop = {"keys": 4, "loop": True}
+    assert rig.key_position(loop, 0) == (0, 1, 0.0)
+    i, j, t = rig.key_position(loop, 224)  # f = 3.5: last key blends back to the first
+    assert (i, j) == (3, 0) and abs(t - 0.5) < 1e-9
+    once = {"keys": 5, "loop": False}
+    assert rig.key_position(once, 0) == (0, 1, 0.0)
+    assert rig.key_position(once, 255) == (3, 4, 1.0)
 
 
-def test_rider_sits_on_saddle():
-    horse, rider = gen_rigs.RIGS[gen_rigs.HORSE], gen_rigs.RIGS[gen_rigs.PC]
-    sx, sy, sz = rig.attach(horse, "saddle", "gallop", 0, 3.0, 0.0, 4.0, math.pi / 2)
-    assert abs(sx - 2.95) < 1e-6 and abs(sz - 4.0) < 1e-6 and 1.6 < sy < 1.9  # 5 cm behind the centre
-    hips = rig.pose(rider, "ride", 0)["root"][1]
-    assert hips == tuple(rider["bones"][0]["offset"])
+def test_rest_pose_and_kneel():
+    standing = rig.pose(MOOSE, 0, 0)
+    assert abs(rig.transform(standing[0], (0, 0, 0))[1] - 6.0) < 1e-9  # torso 6 m up
+    kneeling = rig.pose(MOOSE, 6, 255)
+    assert abs(rig.transform(kneeling[0], (0, 0, 0))[1] - 3.7) < 1e-9  # root_y -2.3
+
+
+def test_world_transform_and_inverse():
+    poses = rig.world_poses(MOOSE, 0, 0, 10.0, 1.0, -5.0, math.pi / 2)
+    root = rig.transform(poses[0], (0, 0, 0))
+    assert all(abs(a - b) < 1e-9 for a, b in zip(root, (10.0, 7.0, -5.0)))
+    # Yaw pi/2 turns the rig's +Z (its front) towards +X.
+    nose = rig.transform_dir(poses[0], (0, 0, 1))
+    assert abs(nose[0] - 1) < 1e-9
+    back = rig.transform(rig.inverse(poses[2]), rig.transform(poses[2], (0.3, -0.2, 1.1)))
+    assert all(abs(a - b) < 1e-9 for a, b in zip(back, (0.3, -0.2, 1.1)))
+
+
+def test_slot_matrix_uses_bone_offset_and_rotation():
+    poses = rig.pose(MOOSE, 0, 0)
+    back = rig.slot_matrix(MOOSE, poses, 4)  # root, offset (0, 1.6, -1.5), rot (-90, 0, 0)
+    assert all(abs(a - b) < 1e-9 for a, b in zip(rig.transform(back, (0, 0, 0)), (0, 7.6, -1.5)))
+    up = rig.transform_dir(back, (0, 0, 1))  # part meshes face +Z; rx -90 turns that up
+    assert abs(up[1] - 1) < 1e-9

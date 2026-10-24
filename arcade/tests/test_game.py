@@ -21,10 +21,10 @@ def started():
 
 def test_ready_shows_prompt_and_a_starts():
     game = Game(world.make_scene(1))
-    _, objs, hud, _ = game.step(raw(), DT)
-    assert game.state == READY and hud.state == g3d.STATE_READY and hud.msg == 12
-    assert objs == []  # the PC is drawn as rigs now
-    boss, horse, rider = game.rigs()
+    frame = game.step(raw(), DT)
+    assert game.state == READY and frame.hud.state == g3d.STATE_READY and frame.hud.msg == 12
+    assert frame.objects == []  # the PC is drawn as rigs: horse and rider
+    boss, horse, rider = frame.rigs
     assert (boss.rig_id, horse.rig_id, rider.rig_id) == (1, 3, 4) and horse.char_light and rider.char_light
     game.step(raw(pressed=g3d.BTN_A), DT)
     assert game.state == FIGHT
@@ -43,15 +43,15 @@ def test_stick_forward_walks_away_from_camera():
 def test_holding_b_fires_at_cooldown_rate():
     game = started()
     for _ in range(6):  # 0.3 s with a 0.25 s cooldown -> two shots
-        _, objs, _, _ = game.step(raw(held=g3d.BTN_B), DT)
-    assert len(game.player.bullets) == 2
-    assert sum(o.mesh == 1 for o in objs) == 2
+        frame = game.step(raw(held=g3d.BTN_B), DT)
+    assert game.player.shots == 2
+    assert sum(o.mesh == 1 for o in frame.objects) == 2  # both tracers still flying
 
 
 def test_tap_shorter_than_a_frame_still_fires():
     game = started()
     game.step(raw(pressed=g3d.BTN_B), DT)
-    assert len(game.player.bullets) == 1
+    assert game.player.shots == 1
 
 
 def test_menu_navigation_and_restart():
@@ -60,10 +60,10 @@ def test_menu_navigation_and_restart():
         game.step(raw(jy=120), DT)
     game.step(raw(pressed=g3d.BTN_A), DT)
     assert game.state == MENU
-    _, _, hud, _ = game.step(raw(jy=-120), DT)  # stick down -> Restart
+    hud = game.step(raw(jy=-120), DT).hud  # stick down -> Restart
     assert hud.state == g3d.STATE_PAUSED and hud.msg == 10
     game.step(raw(pressed=g3d.BTN_A), DT)
-    assert game.state == READY and game.player.z == -12.0
+    assert game.state == READY and game.player.z == -30.0
 
 
 def test_menu_continue_resumes():
@@ -75,7 +75,7 @@ def test_menu_continue_resumes():
 
 def test_missing_controller_pauses_then_resumes_via_menu():
     game = started()
-    _, _, hud, _ = game.step(raw(connected=3), DT)  # Movement unplugged
+    hud = game.step(raw(connected=3), DT).hud  # Movement unplugged
     assert game.state == MISSING and hud.msg == 8
     game.step(raw(), DT)
     assert game.state == MENU
@@ -120,7 +120,7 @@ def test_shooting_does_not_turn_the_horse():
     game.camera.yaw += 1.0  # look well off to the side, then shoot
     for _ in range(3):
         game.step(raw(held=g3d.BTN_B), DT)
-    assert game.player.bullets and game.player.yaw == yaw
+    assert game.player.tracers and game.player.yaw == yaw
 
 
 def test_idle_horse_stands_and_moving_gallops():
@@ -139,3 +139,51 @@ def test_stick_steers_horse_and_camera_together():
         game.step(raw(jx=120), DT)  # full right, no throttle: turn on the spot
     assert game.player.yaw < -0.5  # turning right lowers yaw
     assert abs((game.camera.yaw - game.player.yaw) - offset) < 1e-9
+
+
+def test_each_round_fits_two_legs_the_back_and_the_head():
+    import random
+    from boss import pick_parts, slots_tagged
+    from gen.rigs import RIGS
+    moose = RIGS[1]
+    parts = slots_tagged(moose, "phase1", "phase2")
+    head = slots_tagged(moose, "cover", "weak")
+    combos = set()
+    for seed in range(20):
+        variants = pick_parts(random.Random(seed))
+        fitted = [s for s in parts if variants[s]]
+        assert len(fitted) == 3 and all(variants[s] == 1 for s in head)
+        assert sum(variants[s] > 0 for s in slots_tagged(moose, "leg")) == 2
+        assert all(variants[s] for s in slots_tagged(moose, "back"))
+        assert not any(variants[s] for s in slots_tagged(moose, "neck"))
+        assert all(1 <= variants[s] < len(moose["slots"][s]["variants"]) for s in fitted)
+        combos.add(tuple(variants))
+    assert len(combos) > 5
+
+
+def test_restart_picks_new_parts_and_bumps_scene_version():
+    game = Game(world.make_scene(1), seed=3)
+    first, version = list(game.scene.slot_variants), game.scene_version
+    seen = {tuple(first)}
+    for _ in range(5):
+        game.restart()
+        seen.add(tuple(game.scene.slot_variants))
+    assert game.scene_version == version + 5 and len(seen) > 1
+
+
+def test_frame_carries_the_boss_rig():
+    game = started()
+    frame = game.step(raw(), DT)
+    assert frame.rigs[0].rig_id == 1 and frame.rigs[0].part_alive == game.boss.alive
+    assert bin(frame.rigs[0].part_alive).count("1") == 5  # two legs, the back, cover and weak point
+    assert frame.hud.boss_hp == 255
+
+
+def test_tap_during_cooldown_fires_when_it_ends():
+    game = started()
+    game.step(raw(pressed=g3d.BTN_B), DT)
+    game.step(raw(pressed=g3d.BTN_B), DT)  # 0.05 s later, still cooling down
+    assert game.player.shots == 1
+    for _ in range(5):
+        game.step(raw(), DT)
+    assert game.player.shots == 2

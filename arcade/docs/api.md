@@ -142,7 +142,7 @@ flowchart LR
 | 1 | u8 | `anim_id` |
 | 2 | u8 | `anim_phase`（0–255，表示一个动画周期内的位置） |
 | 3 | u8 | `hit_slot`（被击中而闪烁的槽位，0xFF = 无） |
-| 4 | i16×3 | `x, y, z`（骨骼根节点所在的原点；根骨骼的 `offset` 再叠加在上面） |
+| 4 | i16×3 | `x, y, z`：rig 原点，即 BOSS / 马脚下的地面点（骑手见下文）；骨骼世界矩阵 = `T(x, y, z)·Ry(yaw)·W(bone)`，根骨骼的 `offset` 在 `W` 里 |
 | 10 | u16 | `yaw` |
 | 12 | u32 | `part_alive`（bit i 表示槽位 i 未被击破；没有槽位的 rig 发 0） |
 | 16 | u8 | `rflags`：bit0 使用角色灯（[art.md §4](art.md#4-调色与滤镜look)）；bit1–7 为 `fade`（0–127，颜色混向雾色的程度，127 = 不画） |
@@ -194,7 +194,7 @@ flowchart LR
 | 14 | u8 | `render_ms` |
 | 15 | u8 | `push_ms` |
 
-**`msg_id` 表**（文字存在 MCU 端，`sketch/hud_text.h`）：0 无，1 “Press A to start”，2 “Break the armor”，3 “Hook on! (C)”，4 “Strike the head”，5 “Hold on!”，6 “Victory - C to restart”（被 13 取代），7 “Defeated - C to restart”（被 14 取代），8 “Controller missing”，9 菜单选中 Continue，10 菜单选中 Restart，11 菜单选中 Recalibrate（`game_state = 4` 时 HUD 画三项菜单并高亮该项），12 “Hold the console naturally, press A”，13 “Victory - A to restart”，14 “Defeated - A to restart”，15 “Stick move  Tilt look  B shoot  A menu”，16 “Waiting for Python”（仅 MCU 演示画面使用）。新增文案时追加编号，不要改已有编号。*（9–16 和 3 的按键文字为 2026-10-24 改动，跟随新的操作表，待 A 确认）*文案**只允许 ASCII 0x20–0x7E**，用像素字体绘制（[art.md §5](art.md#5-hud-与字体)），构建时检查。
+**`msg_id` 表**（文字存在 MCU 端，`sketch/hud_text.h`）：0 无，1 “Press A to start”，2 “Break the armor”，3 “Hook on! (C)”，4 “Strike the head”，5 “Hold on!”，6 “Victory - C to restart”（被 13 取代），7 “Defeated - C to restart”（被 14 取代），8 “Controller missing”，9 菜单选中 Continue，10 菜单选中 Restart，11 菜单选中 Recalibrate（`game_state = 4` 时 HUD 画三项菜单并高亮该项），12 “Hold the console naturally, press A”，13 “Victory - A to restart”，14 “Defeated - A to restart”，15 “Stick move  Tilt look  B shoot  A menu”，16 “Waiting for Python”（仅 MCU 演示画面使用），17 “Break the crystals”。新增文案时追加编号，不要改已有编号。*（9–17 和 3 的按键文字为 2026-10-24 改动，跟随新的操作表，待 A 确认）*文案**只允许 ASCII 0x20–0x7E**，用像素字体绘制（[art.md §5](art.md#5-hud-与字体)），构建时检查。
 
 ### 3.6 Sky（`g3d_scene_sky` 的 `data`，90 B）
 

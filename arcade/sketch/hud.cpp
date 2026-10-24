@@ -87,6 +87,14 @@ void bossBar(const Canvas& c, uint8_t hp) {
 // Cross, corners on a part, diamond when hookable (art.md §5).
 void reticle(const Canvas& c, const g3d::Frame& f) {
   const int x = FRAME_W / 2 + f.reticleX, y = FRAME_H / 2 + f.reticleY;
+  if ((f.reticleFlags & 3) == 3) {  // on a part and a hook point in range: both shapes
+    g3d::Frame part = f, hook = f;
+    part.reticleFlags = 1;
+    hook.reticleFlags = 2;
+    reticle(c, part);
+    reticle(c, hook);
+    return;
+  }
   if (f.reticleFlags & 2) {
     const uint16_t col = pal(gen::PAL_HOOK_OK);
     for (int i = -4; i <= 4; ++i) {

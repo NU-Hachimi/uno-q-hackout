@@ -189,7 +189,12 @@ def build():
                        f"{len(mesh['tris'])}, {len(mesh['groups'])}, {fmt_float(mesh['radius'])}}},  // {mid}")
         else:
             out.append(f"    {{nullptr, nullptr, nullptr, nullptr, 0, 0, 0.0f}},  // {mid} unused")
-    out += ["};", "", "}  // namespace gen", ""]
+    out += ["};", "", "// Attachment points in mesh space, metres (meshes.json attach)."]
+    for mid in sorted(meshes):
+        for point, xyz in meshes[mid][0].get("attach", {}).items():
+            out.append(f"constexpr float ATTACH_{meshes[mid][0]['name'].upper()}_{point.upper()}[3] = "
+                       f"{{{', '.join(fmt_float(c) for c in xyz)}}};")
+    out += ["", "}  // namespace gen", ""]
     meshes_h = "\n".join(out)
 
     def u16(value):

@@ -98,9 +98,9 @@ gantt
 | **A3** TGX 分块（60 min） | `sketch.yaml`、`sketch/render.*` | 加入 TGX 1.1.4；240×16 分块渲染旋转立方体，`pushRow2x` 推屏；实现 `G3D_DEMO=1` 演示模式的框架 | `make build` 通过；串口打印 `render_ms`、`push_ms` 和 fps（**G2**）；记录 LLEXT 堆用量 | 立方体正确、不撕裂 |
 | **A4** rpc + scene ✅ | `sketch/rpc.*`、`sketch/scene.*`、`sketch/inputs.*`、`sketch.ino` | 注册 api §2 全部方法（`Bridge.provide`，Bridge 线程只校验和拷贝，`k_mutex` 保护），保留 `arcade_read_inputs` / `arcade_video_*`；`scene_begin/chunk/commit` 包括 CRC 校验，kind 3 Look 按模式 1 调色；按键锁存（Input `buttons` bit4–7）；超过 1.5 s 没收到帧就回到演示画面 | `tests/cpp/render_preview.sh --snapshots` 用 Python 生成的场景和帧渲染出 PNG；板上 `g3d_debug_stats` 显示 `live: 1`、`seq` 递增、收包 20 包/秒 | 地形和物体位置正确 |
 | **B1** `g3d.py` ✅ | `python/g3d.py`、`tests/test_g3d.py` | 实现 `pack_scene`（hdr + chunks + CRC-16/CCITT-FALSE）、`pack_frame`、`unpack_input`（同时兼容 bytes 和 hex str，解析按键锁存位），以及 `G3D` 连接层（超时、重试、重新加载场景） | `pytest tests/` 通过 | — |
-| **B2** 生成工具（`mesh_build.py` ✅） | `tools/mesh_build.py`、`tools/rig_build.py`、`tools/snapshot.py` | `mesh_build.py`：OBJ + MTL → `sketch/gen/meshes.h`（按调色板索引分组）、`sketch/gen/palette.h`（调色板、默认 Look、场景默认值）、`python/gen/{mesh_ids,palette}.py`，`--check` 检查是否过期；`rig_build.py`：rig JSON → `sketch/gen/rigs.h` + `python/gen/rigs.py` + `tests/golden/rig_*.json` ✅；`mesh_build.py` 另生成 `python/gen/looks.py`（所有 Look 的 kind 3 块）✅；`snapshot.py` 用真实游戏代码生成场景和帧，供桌面预览渲染 | 生成文件后再生成一次，内容不变；`make build` 能 include 生成的头文件 | B 审核骨骼数据 |
+| **B2** 生成工具 ✅ | `tools/mesh_build.py`、`tools/rig_build.py`、`tools/snapshot.py` | `mesh_build.py`：OBJ + MTL → `sketch/gen/meshes.h`（含挂点）、`palette.h`、`python/gen/{mesh_ids,palette,looks}.py`（`looks.py` 是所有 Look 的 kind 3 块）；`rig_build.py`：rig JSON → `sketch/gen/rig_*.h`（含挂点）、`rigs.h`、`python/gen/rig_*.py`、`tests/golden/rig_*.json`；两个都有 `--check`；`snapshot.py` 用真实游戏代码生成预览帧 | 重复生成内容不变；`tests/cpp/rig_golden.sh` 误差 0.01 mm | B 审核骨骼数据 |
 | **B3** `sim.py`（45 min） | `tools/sim.py` | 用 pygame 做线框渲染：读 `pack_frame` 输出的帧，按 api 约定还原相机、BOSS 骨骼和物体；键盘模拟摇杆和按键 | 无头模式（`SDL_VIDEODRIVER=dummy`）跑 300 帧不报错 | 能在电脑上走动并看到 BOSS 线框 |
-| **B4** 世界、姿态、碰撞（60 min） | `python/world.py`、`rig.py`、`collide.py`、`controls.py` | `make_scene(seed)` 生成高度图和岩石；`terrain_height` 用双线性插值；`rig.pose` 和 `colliders_world`；`ray_cast` 和 `sphere_vs`；`Controls` 做边沿检测 | `pytest` 通过，包括 rig golden 比对（误差 ≤ 1 cm）和射线命中的各种情况 | — |
+| **B4** 世界、姿态、碰撞 ✅ | `python/world.py`、`rig.py`、`collide.py`、`controls.py`、`aim.py` | 地形；`rig.pose` / `world_poses` / `slot_matrix`；射线对球体和胶囊体、腿部地面圆推出；准星吸附部件和挂点 | `tests/test_rig.py`、`test_collide.py`，golden 比对 | — |
 
 **I1（T+3:30）**：B 的 `main.py` 发送静态场景和绕圈相机，A 的渲染端负责显示。Claude 在日志里检查 `seq_ack` 连续递增，并统计 `render_ms`、`push_ms` 和 RPC 耗时；人观察 10 分钟，并感受输入延迟。
 
@@ -108,13 +108,13 @@ gantt
 
 | 卡 | 文件 | 内容 | Claude 自检 | 人工确认 |
 | --- | --- | --- | --- | --- |
-| **A5** rig 绘制 ✅ | `sketch/rig.*`、`render.*` | 实现 `pose()`（api §5.1），每帧 3 个 Rig 块（BOSS、马、骑手），绘制骨骼网格和槽位部件，处理 `part_alive`、`hit_slot` 闪烁、`fade` 和角色灯；演示画面改为绕麋鹿转圈、循环播放动画，马和骑手绕圈奔跑 | `sh tests/cpp/rig_golden.sh`：772 个骨骼位置，最大误差 0.001 cm；板上 11–12 fps（object 11–19 ms） | idle 和 punch 动作正确 |
+| **A5** rig 绘制 ✅ | `sketch/rig.*`、`render.cpp` | `pose()`（不依赖 TGX，和 `rig.py` 误差 0.01 mm）；每帧 3 个 Rig 块（BOSS、马、骑手）的骨骼网格，BOSS 按场景变体选的部件，`part_alive`、`hit_slot` 闪白，`fade` 和角色灯；按包围球逐块剔除；演示画面绕麋鹿转圈，马和骑手绕圈奔跑 | `sh tests/cpp/rig_golden.sh`；预览 PNG；板上 13 fps（只有 BOSS 时），11–12 fps（加上马、骑手和岩石） | 麋鹿外形正确 |
 | **A6** 雾、天空、草地 | `sketch/render.*` | z-buffer 深度雾配 16 级查找表；天空两色渐变；地形按两种草色交错着色 | `flags.bit1` 开关雾，分别打印两种情况的 `render_ms` | 雾的效果和远处的隐没 |
 | **A7** HUD（基础版 ✅） | `sketch/hud.*`、`hud_text.h`、`hud_font.h` | 血格、BOSS 血条、准星（十字 / 部件四角 / 可挂钩菱形）、`msg_id` 文案、暂停菜单（`msg_id` 9–11 高亮）、Ready 和结算提示；只画在当前分块内。字体暂用 Adafruit GFX 的 5×7，等 `assets/fonts/` 和 `font_build.py` | 桌面预览 `--snapshots` 的 5 张图 | 5 种布局清楚可读 |
 | **A8** 陀螺仪（可选） | `sketch/rpc.*` | 在 Input 中填入 `gx/gy`。视角改由加速度的倾斜速率控制，陀螺仪不再必需 | Python 日志中转动掌机时 `gx/gy` 有变化 | — |
 | **B5** `Game`（Ready / Fight / 菜单 ✅） | `python/game.py`、`main.py` | Ready → Fight ⇄ 菜单（Continue / Restart / Recalibrate）→ Win/Lose → 重开；每局重置；控件断开时进入 Paused，重连后回到菜单 | `tests/test_game.py` 用脚本输入断言状态切换 | Ready 按 A 开局，A 打开菜单，三项都能用 |
 | **B6** `Player`（移动 + 射击 ✅，瞄准吸附待做） | `python/player.py`、`controls.py` | 移动（相对相机）、倾斜视角（速率控制 + 死区，开局采样中立姿势，**轴向和正负号在板上实测**）、B 射击（冷却连发，子弹飞向准星对地形的交点，落地冒火花）、血格；瞄准吸附等 BOSS 有碰撞体后做 | 单元测试：前推摇杆远离相机、按住 B 的射速、短按也能射出、倾斜死区 | 手感 |
-| **B7** `Boss` | `python/boss.py` | idle / punch AI；部件血量；`events` 攻击判定；三个阶段（腿甲 → 背颈结晶 → 头部） | 脚本模拟打完一整局 | 前摇看得清、躲得开 |
+| **B7** `Boss` ✅ | `python/boss.py` | 平时不转身；人物 14 m 内时每 5–8 s：慢慢转向 → `punch_r` / `sweep`，按 `events` 判定扣血；2 腿甲 + 背 + 头；腿甲碎后跪地不再攻击；腿和背碎后石盖碎、露出弱点 | `tests/test_boss.py` | 前摇看得清、躲得开 |
 | **B8** `Camera`（基础版 ✅） | `python/camera.py` | 第三人称：PC 身后 6 m、右肩偏移 0.7 m；倾斜控制偏航和俯仰，俯仰限制在 −35° 到 +25°；不低于地面 0.4 m；BOSS 不在画面里时自动回正（等 BOSS） | 桌面预览检查相机不会穿进地形 | 画面不抖、能找到 BOSS |
 
 **I2（T+6:30）**：完整打一局 P0。人对照评分表自测，Claude 检查日志里有没有异常和丢帧。
@@ -123,11 +123,11 @@ gantt
 
 | 卡 | 文件 | 内容 | Claude 自检 | 人工确认 |
 | --- | --- | --- | --- | --- |
-| **A9** 绳索与钩爪 | `sketch/render.*` | 从 `hand` 挂点到 `anchor` 画 3D 线段，绘制 `hook_head` 物体 | replay 发送 hook 包，渲染不出错 | 绳索跟随钩爪 |
+| **A9** 绳索与钩爪 ✅ | `sketch/render.*` | 从骑手 rig 的 `hand` 挂点（没有骑手时用 PC 网格的 `hand`）到 `anchor` 画朝向相机的细长四边形（ROPE 色，有深度和雾）；钩爪是普通物体 | 预览 `12_hook_flying.png` | 绳索跟随钩爪 |
 | **A10** 岩石实例化 ✅ | `sketch/scene.*`、`render.*`、`python/world.py` | 处理 kind 2 chunk（`variant` 即网格 ID）；岩石按 yaw 和 scale 实例化，y 坐标由 `terrainHeight` 求出，超出雾距离的不画；`world.scatter_rocks` 在场地外散布 40 块岩石和废墟 | 用 g++ 比对 `terrainHeight` 与 Python 版结果一致 | 岩石贴在地面上 |
 | **A11** 性能收尾 | `sketch/render.*` | 按物体包围球的 Y 范围做分块剔除，减少分块次数 | `render_ms` 比 I2 时更低（打印对比） | 帧率体感 |
-| **B9** 钩锁 | `python/player.py`、`collide.py` | 射线只命中 `hookable` 碰撞体；钩爪飞行 0.3 s，以 15 m/s 拉过去；挂点跟随骨骼；按 B 脱离；挂住时伤害 ×2 | 单元测试：BOSS 运动时挂点误差为 0 | 手感 |
-| **B10** 甩动、跪地、弱点、冲击波 | `python/boss.py` | 挂住后触发甩动窗口；腿甲全部击破后跪地；头部弱点只有挂住时才能打中；冲击波需要跳跃躲避 | 脚本模拟打完 P1 一局 | 节奏 |
+| **B9** 钩锁 ✅ | `python/player.py`、`aim.py` | C 发射，只命中 `hookable` 碰撞体，25 m；钩爪飞行 0.3 s，以 15 m/s 拉过去；挂点存在骨骼局部坐标、跟随骨骼；再按 C 脱离并下落；挂住时伤害 ×2、免疫攻击 | `tests/test_hook.py` | 手感 |
+| **B10** 甩动、跪地、弱点、冲击波（跪地和弱点 ✅） | `python/boss.py` | 跪地、弱点只在挂住时可伤 ✅；甩动和冲击波未做 | `tests/test_boss.py`、`test_hook.py` | 节奏 |
 | **B11** 随机组合与难度 | `python/world.py`、`boss.py` | 每局随机部件变体；难度曲线 | 10 个种子生成的局都能打完（脚本） | 难度 |
 
 **I3（T+9:00）**：完整打一局 P1。

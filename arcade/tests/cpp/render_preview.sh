@@ -7,7 +7,7 @@ set -eu
 cd "$(dirname "$0")/../.."
 mkdir -p build/preview
 g++ -std=gnu++17 -O2 -w ${CXXFLAGS:-} -I sketch \
-    tests/cpp/render_preview.cpp sketch/g3d_proto.cpp sketch/scene.cpp sketch/render.cpp sketch/rig.cpp sketch/hud.cpp \
+    tests/cpp/render_preview.cpp sketch/g3d_proto.cpp sketch/scene.cpp sketch/render.cpp sketch/hud.cpp sketch/rig.cpp \
     sketch/src/tgx/*.cpp -o build/preview/render_preview
 
 to_png() {
