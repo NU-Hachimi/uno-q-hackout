@@ -9,7 +9,7 @@ ADB_DEVICE = $(if $(strip $(SERIAL)),-s "$(SERIAL)",-d)
 
 help:
 	@printf '%s\n' \
-	  'make package  Create build/uno-q-arcade.zip for App Lab' \
+	  'make package  Create zip/uno-q-arcade.zip for App Lab' \
 	  'make build    Compile the MCU sketch with arduino-cli' \
 	  'make flash    Deploy Python and sketch, compile, upload, and start on UNO Q' \
 	  'make monitor  Open the MCU serial monitor (Ctrl+C to leave)' \
@@ -22,9 +22,9 @@ help:
 
 package:
 	@command -v zip >/dev/null || { echo 'Install zip to package an App Lab application.' >&2; exit 1; }
-	mkdir -p build
-	rm -f build/uno-q-arcade.zip
-	zip -qr build/uno-q-arcade.zip app.yaml python sketch \
+	mkdir -p zip
+	rm -f zip/uno-q-arcade.zip
+	zip -qr zip/uno-q-arcade.zip app.yaml python sketch \
 	  -x '*/__pycache__/*' '*.pyc' '*/.DS_Store' '*/.venv/*' '*/build/*'
 
 build:
@@ -36,7 +36,7 @@ flash: package
 	@set -eu; \
 	  stage=$$("$(ADB)" $(ADB_DEVICE) shell -T 'mktemp -d /tmp/uno-q-flash.XXXXXX'); \
 	  trap '"$(ADB)" $(ADB_DEVICE) shell -T "rm -rf -- \"$$stage\"" >/dev/null 2>&1 || :' EXIT; \
-	  "$(ADB)" $(ADB_DEVICE) push build/uno-q-arcade.zip "$$stage/app.zip"; \
+	  "$(ADB)" $(ADB_DEVICE) push zip/uno-q-arcade.zip "$$stage/app.zip"; \
 	  "$(ADB)" $(ADB_DEVICE) shell -T "sh -s -- \"$$stage/app.zip\"" < scripts/flash.sh
 
 monitor:
@@ -52,4 +52,4 @@ devices:
 	"$(ADB)" devices -l
 
 clean:
-	rm -rf build/sketch build/uno-q-arcade.zip
+	rm -rf build/sketch zip/uno-q-arcade.zip

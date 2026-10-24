@@ -30,19 +30,24 @@ flowchart LR
 
 For a terminal workflow, use [`make flash` and `make monitor`](#terminal-commands) below, then continue with the control preview here.
 
-The App Lab application is the **`arcade/` folder**. Use the prepared ZIP, or open a terminal in `arcade/` and run this with GNU Make and `zip` installed:
+The App Lab application is the **`arcade/` folder**. The import ZIP is in [`zip/uno-q-arcade.zip`](zip/uno-q-arcade.zip), inside the visible `zip/` folder at the root of this track. To rebuild it after editing the source, open a terminal in `arcade/` and run this with GNU Make and `zip` installed:
 
 ```sh
 make package
 ```
 
-Import `build/uno-q-arcade.zip` from this track folder. Without Make, create the archive from the same folder in a macOS/Linux terminal:
+In App Lab's **My Apps**, import **`zip/uno-q-arcade.zip`** and select the UNO Q. Select the ZIP file itself; `zip/` only stores the archive. The archive contains `app.yaml`, `python/main.py`, and `sketch/` at the paths App Lab expects.
+
+Without Make, rebuild the archive from `arcade/` in a macOS/Linux terminal:
 
 ```sh
-zip -r /tmp/uno-q-arcade.zip app.yaml python sketch -x '*/__pycache__/*' '*.pyc'
+mkdir -p zip
+rm -f zip/uno-q-arcade.zip
+zip -r zip/uno-q-arcade.zip app.yaml python sketch \
+  -x '*/__pycache__/*' '*.pyc' '*/.DS_Store' '*/.venv/*' '*/build/*'
 ```
 
-On Windows, ZIP `app.yaml`, `python/`, and `sketch/` with `app.yaml` at the archive root. Import it from **My Apps** in App Lab and select the UNO Q.
+On Windows, ZIP `app.yaml`, `python/`, and `sketch/` with `app.yaml` at the archive root, and save it as `zip/uno-q-arcade.zip`.
 
 In the imported `sketch/sketch.ino`, match `ARCADE_TFT_HX8357D` to the supplied console setting: **`1` for HX8357D** (the default), **`0` for RM68140**. Run the app. The first run needs Internet access and several minutes to download and compile dependencies.
 
@@ -206,7 +211,7 @@ After editing local files, run `make flash` again. It replaces those source path
 | `make monitor` | Open the MCU serial monitor |
 | `make logs` | Follow Python output, including `print()` and errors |
 | `make stop` | Stop this track's terminal-managed app |
-| `make package` | Create `build/uno-q-arcade.zip` for App Lab import |
+| `make package` | Rebuild [`zip/uno-q-arcade.zip`](zip/uno-q-arcade.zip) for App Lab import |
 | `make build` | Compile only the MCU sketch locally with [Arduino CLI](https://arduino.github.io/arduino-cli/) |
 | `make clean` | Remove this track's local ZIP and sketch build |
 

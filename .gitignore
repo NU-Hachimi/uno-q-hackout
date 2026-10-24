@@ -4,5 +4,6 @@ __pycache__/
 *.py[cod]
 build/
 *.zip
+!/arcade/zip/uno-q-arcade.zip
 robocar/captures/
 robocar/models/
