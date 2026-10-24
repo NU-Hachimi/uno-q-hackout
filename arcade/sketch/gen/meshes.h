@@ -190,4 +190,7 @@ static const Mesh MESHES[MESH_COUNT] = {
     {arch_fragment_verts, arch_fragment_tris, arch_fragment_group_end, arch_fragment_group_color, 27, 3, 5.6658f},  // 32
 };
 
+// Attachment points in mesh space, metres (meshes.json attach).
+constexpr float ATTACH_PC_HAND[3] = {0.2800f, 1.1000f, 0.1200f};
+
 }  // namespace gen

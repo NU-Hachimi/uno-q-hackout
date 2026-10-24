@@ -36,4 +36,7 @@ bool uploadChunk(uint8_t kind, uint8_t index, const uint8_t* data, size_t n);
 bool uploadCommit(uint16_t crc);
 bool applyUpload();  // copies a committed upload into the live scene; true means re-bake
 
+uint8_t rigId();                  // boss rig of the live scene (header rig_id), 0 for none
+uint8_t slotVariant(int slot);    // fitted part variant per rig slot, 0 = empty
+
 }  // namespace scene

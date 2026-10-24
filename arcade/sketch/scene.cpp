@@ -12,6 +12,11 @@ int8_t heights[MAX_N * MAX_N];
 uint16_t palette[32];
 
 namespace {
+uint8_t liveRig = 0;
+uint8_t liveVariants[32];
+}  // namespace
+
+namespace {
 
 constexpr float TAU = 6.28318530718f;
 constexpr int CHUNK = 192;
@@ -30,6 +35,7 @@ struct Staging {
   int nRocks;
   uint32_t terrainChunks, rockChunks;  // bit per received chunk index
   uint8_t lookRaw[LOOK_SIZE];  // kept as sent, for the CRC
+  uint8_t rig, nSlots, variants[32];
   gen::Look look;
   bool hasLook, begun, committed;
 };
@@ -95,6 +101,8 @@ void buildDemo(uint32_t seed) {
   const RawColors raw = {gen::SCENE_SKY_TOP, gen::SCENE_SKY_HORIZON, gen::SCENE_FOG_COLOR, gen::SCENE_GRASS_A,
                          gen::SCENE_GRASS_B};
   applyLook(gen::DEFAULT_LOOK, raw, params);
+  liveRig = 1;  // the moose with the first variant of every part, for the demo
+  memset(liveVariants, 1, sizeof(liveVariants));
 
   const int n = params.terrainN;
   for (int j = 0; j < n; ++j) {
@@ -149,7 +157,10 @@ bool uploadBegin(const uint8_t* h, size_t n) {
   if (p.terrainN < 2 || p.terrainN > MAX_N || p.cell <= 0 || p.fogFar <= p.fogNear || p.fogFar < 4 ||
       staging.nRocks > MAX_ROCKS)
     return false;
-  // Slot variants (h[25..]) belong to the boss rig, which is not drawn yet.
+  staging.rig = h[1];
+  staging.nSlots = h[24] > 32 ? 32 : h[24];
+  memset(staging.variants, 0, sizeof(staging.variants));
+  memcpy(staging.variants, h + 25, staging.nSlots);
   staging.terrainChunks = staging.rockChunks = 0;
   staging.hasLook = false;
   staging.begun = true;
@@ -214,7 +225,12 @@ bool applyUpload() {
   params = staging.params;
   memcpy(heights, staging.heights, sizeof(int8_t) * params.terrainN * params.terrainN);
   applyLook(staging.hasLook ? staging.look : gen::DEFAULT_LOOK, staging.colors, params);
+  liveRig = staging.rig;
+  memcpy(liveVariants, staging.variants, sizeof(liveVariants));
   return true;
 }
+
+uint8_t rigId() { return liveRig; }
+uint8_t slotVariant(int slot) { return slot >= 0 && slot < 32 ? liveVariants[slot] : 0; }
 
 }  // namespace scene

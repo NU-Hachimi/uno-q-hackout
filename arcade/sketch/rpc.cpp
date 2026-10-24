@@ -5,6 +5,7 @@
 #include <zephyr/kernel.h>
 
 #include "gen/meshes.h"
+#include "gen/rigs.h"
 #include "inputs.h"
 #include "render.h"
 #include "scene.h"
@@ -49,7 +50,7 @@ Reply hello(int version) {
   caps[6] = g3d::MAX_OBJ;
   caps[7] = 32;                // max slots
   caps[8] = gen::MESH_COUNT;
-  caps[9] = 0;                 // rigs: none built yet
+  caps[9] = gen::RIG_COUNT - 1;  // rig ids 1..n
   caps[10] = G3D_BIN_RETURN;   // bit0 bin return; bit1 per-pixel grading (not yet)
   return reply(caps, sizeof(caps));
 }
