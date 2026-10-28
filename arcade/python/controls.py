@@ -1,7 +1,7 @@
-"""Controller mapping: calibrated stick, button edges and tilt-to-look rates (docs/plan.md 操作表)."""
+"""Controller mapping: move stick, button edges and right-stick look rates (docs/plan.md 操作表; on Alia Pad
+the right stick replaces tilt, tilt_config.py)."""
 
 import math
-import time
 from dataclasses import dataclass
 
 import tilt_config as tilt
@@ -9,7 +9,7 @@ from g3d import BTN_A, BTN_B, BTN_C, BTN_STICK
 from preview import DEAD_ZONE, INVERT_X, INVERT_Y
 
 STICK_FULL = 120  # raw stick reading treated as full deflection
-DEBUG_PERIOD = 0.5  # s between tilt debug lines (tilt_config.DEBUG_LOG)
+LOOK_FULL = 127   # right stick full deflection (g3d.RawInput rx, ry)
 
 
 @dataclass
@@ -20,48 +20,18 @@ class Input:
     pitch_rate: float = 0.0  # rad/s, positive = look up
     pressed: int = 0         # BTN_* newly pressed since the previous frame
     held: int = 0
-    connected: int = 7       # bit0 Buttons, bit1 Joystick, bit2 Movement
+    connected: int = 7       # bit0 Buttons, bit1 Joystick, bit2 Movement (always set on Alia Pad)
 
 
-def _norm(v):
-    length = math.sqrt(sum(c * c for c in v))
-    return tuple(c / length for c in v) if length > 1e-6 else None
-
-
-def axis_vector(name, invert=False):
-    """'x', '-y', ... from tilt_config -> unit vector in Movement sensor axes."""
-    text = str(name).strip().lower()
-    sign = -1.0 if text.startswith("-") else 1.0
-    letter = text.lstrip("+-")
-    if letter not in ("x", "y", "z"):
-        raise ValueError(f"tilt_config: axis must be x, y or z with an optional '-', got {name!r}")
-    v = [0.0, 0.0, 0.0]
-    v["xyz".index(letter)] = -sign if invert else sign
-    return tuple(v)
-
-
-def tilt_rate(s, max_rate_deg):
-    """Sine of the tilt along an axis -> view rate in rad/s (tilt_config dead zone and curve)."""
-    dead = math.sin(math.radians(tilt.DEAD_ZONE_DEG))
-    full = math.sin(math.radians(tilt.FULL_DEG))
-    t = (abs(s) - dead) / (full - dead)
+def look_rate(v, max_rate_deg):
+    """Right stick deflection (-1..1) -> view rate in rad/s (tilt_config dead zone and curve)."""
+    t = (abs(v) - tilt.DEAD_ZONE) / (1.0 - tilt.DEAD_ZONE)
     if t <= 0:
         return 0.0
-    return math.copysign(min(t, 1.0) ** tilt.CURVE * math.radians(max_rate_deg), s)
+    return math.copysign(min(t, 1.0) ** tilt.CURVE * math.radians(max_rate_deg), v)
 
 
 class Controls:
-    def __init__(self):
-        self.gravity = None  # smoothed unit gravity vector in sensor axes
-        self.neutral = None
-        self.yaw_axis = axis_vector(tilt.YAW_AXIS, tilt.INVERT_YAW)
-        self.pitch_axis = axis_vector(tilt.PITCH_AXIS, tilt.INVERT_PITCH)
-        self.debug_at = 0.0
-
-    def calibrate(self):
-        """Take the current pose as neutral (Ready screen A press, or Recalibrate)."""
-        self.neutral = self.gravity
-
     def update(self, raw):
         """RawInput (or None after a failed frame) -> Input."""
         if raw is None:
@@ -78,32 +48,11 @@ class Controls:
             if mag > DEAD_ZONE:
                 scale = min(1.0, (mag - DEAD_ZONE) / (STICK_FULL - DEAD_ZONE)) / mag
                 inp.move_x, inp.move_y = fx * scale, fy * scale
-
-        if raw.connected & 4:
-            g = _norm((raw.ax, raw.ay, raw.az))
-            if g:
-                self.gravity = g if self.gravity is None else _norm(
-                    tuple(a + tilt.SMOOTHING * (b - a) for a, b in zip(self.gravity, g)))
-                if self.neutral is None:
-                    self.neutral = self.gravity
-                # For a tilt of angle θ about an axis perpendicular to `axis`, the unit gravity
-                # vector moves by about sin θ along `axis`.
-                delta = [a - b for a, b in zip(self.gravity, self.neutral)]
-                inp.yaw_rate = tilt_rate(sum(d * a for d, a in zip(delta, self.yaw_axis)), tilt.MAX_YAW_RATE_DEG)
-                inp.pitch_rate = tilt_rate(sum(d * a for d, a in zip(delta, self.pitch_axis)), tilt.MAX_PITCH_RATE_DEG)
-                if tilt.DEBUG_LOG:
-                    self._debug(delta, inp)
+            rx = -raw.rx if tilt.INVERT_YAW else raw.rx
+            ry = -raw.ry if tilt.INVERT_PITCH else raw.ry
+            inp.yaw_rate = look_rate(rx / LOOK_FULL, tilt.MAX_YAW_RATE_DEG)
+            inp.pitch_rate = look_rate(ry / LOOK_FULL, tilt.MAX_PITCH_RATE_DEG)
         return inp
-
-    def _debug(self, delta, inp):
-        now = time.monotonic()
-        if now - self.debug_at < DEBUG_PERIOD:
-            return
-        self.debug_at = now
-        deg = [math.degrees(math.asin(max(-1.0, min(1.0, d)))) for d in delta]
-        print(f"tilt from neutral: x={deg[0]:+4.0f} y={deg[1]:+4.0f} z={deg[2]:+4.0f} deg | "
-              f"yaw {math.degrees(inp.yaw_rate):+4.0f} deg/s, pitch {math.degrees(inp.pitch_rate):+4.0f} deg/s",
-              flush=True)
 
 
 __all__ = ["Controls", "Input", "BTN_A", "BTN_B", "BTN_C", "BTN_STICK"]

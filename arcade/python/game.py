@@ -1,4 +1,4 @@
-"""Round state machine: Ready -> Intro -> Fight <-> Menu -> Win / Lose, with Restart and Recalibrate (docs/plan.md).
+"""Round state machine: Ready -> Intro -> Fight <-> Menu -> Win / Lose, with Restart (docs/plan.md).
 
 Ready: the PC rides back and forth far out, beyond the fog, with the boss hidden and the camera behind it.
 A starts the intro: the PC turns and gallops on its own towards the boss, which looms out of the fog, and reins in at the fight spawn; then the
@@ -26,8 +26,8 @@ MSG_CRYSTALS = 17
 MSG_JUMP_OFF = 18
 MSG_FINISH = 19
 MSG_MISSING = 8
-MSG_MENU = (9, 10, 11)   # Continue, Restart, Recalibrate
-MSG_HOLD_AND_PRESS_A = 12
+MSG_MENU = (9, 10)       # Continue, Restart
+MSG_PRESS_A = 1
 MSG_VICTORY = 13
 MSG_DEFEATED = 14
 MSG_HINT = 15
@@ -139,7 +139,6 @@ class Game:
             self.ready_to = -self.ready_to  # turn back near the end of the line
         self._ride_to(self.ready_to, READY_SPAWN[1], READY_THROTTLE, dt)
         if inp.pressed & BTN_A:
-            self.controls.calibrate()
             self.camera = ThirdPersonCamera(self.player.yaw)
             self.player.boost, self.intro_time = INTRO_BOOST, 0.0
             self.state = INTRO
@@ -240,8 +239,6 @@ class Game:
             if choice == MSG_MENU[1]:
                 self.restart()
             else:
-                if choice == MSG_MENU[2]:
-                    self.controls.calibrate()
                 self.state = FIGHT
 
     def music(self):
@@ -266,7 +263,7 @@ class Game:
                       boss_hp=max(1, round(self.boss.health() * 255)) if self.boss.health() > 0 else 0)
         flags = 0
         if self.state == READY:
-            hud.state, hud.msg = g3d.STATE_READY, MSG_HOLD_AND_PRESS_A
+            hud.state, hud.msg = g3d.STATE_READY, MSG_PRESS_A
         elif self.state == INTRO:
             hud.state, hud.msg = g3d.STATE_FIGHT, 0
             flags |= g3d.FLAG_NO_HUD

@@ -1,0 +1,35 @@
+# Megalith as an Alia Pad cart (alia-pad docs/cart.md). `make cart` assembles build/cart/ around
+# this file: content/ holds the game (python/), alia-engine's module (content/python/) and the
+# generated art next to this manifest.
+[cart]
+id          = "com.nuhachimi.megalith"
+title       = "Megalith"
+title_zh    = "巨构"
+version     = "1.1.0"
+publisher   = "NU Hachimi"
+description = """A low-poly boss fight in the spirit of Shadow of the Colossus. Ride around a giant \
+stone moose, shoot off its leg armor and back crystals, grapple onto its back or brow, and finish it.
+Left stick rides, right stick looks, B shoots, X fires the hook, A opens the menu."""
+
+[runtime]
+type  = "python"
+entry = "main.py"
+
+[display]
+render = "640x360"
+
+[input]
+uses    = ["gamepad"]
+confirm = "east"
+
+[permissions]
+network = false
+
+[save]
+quota_kb = 64
+
+[art]
+icon        = "icon.png"
+cover       = "cover.png"
+background  = "background.png"
+screenshots = ["screenshots/1_ride.png", "screenshots/2_aim.png", "screenshots/3_night.png"]

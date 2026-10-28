@@ -3,6 +3,8 @@
 so tests/cpp/render_preview.sh --snapshots can render them with the MCU renderer.
 
     python3 tools/snapshot.py OUT_DIR
+    python3 tools/snapshot.py OUT_DIR --alia   also NAME.alia.png from alia-engine (python/alia_view.py),
+                                               headless; alia_engine must be importable (PYTHONPATH)
 """
 
 import struct
@@ -19,12 +21,12 @@ from boss import CHARGING, STRIKING  # noqa: E402
 from game import Game  # noqa: E402
 
 DT = 0.05
-NEUTRAL_G = (0, 0, 1000)  # mg; any pose works, the game calibrates on the A press
+NEUTRAL_G = (0, 0, 1000)  # mg; unused since the right stick replaced tilt
 
 
-def raw(jx=0, jy=0, held=0, pressed=0, connected=7, accel=NEUTRAL_G):
+def raw(jx=0, jy=0, held=0, pressed=0, connected=7, accel=NEUTRAL_G, rx=0, ry=0):
     # Stick values in raw units with preview.py's INVERT_Y: pushing forward reads positive jy.
-    return g3d.RawInput(0, connected, held, pressed, jx, jy, *accel, 0, 0, 0, 0)
+    return g3d.RawInput(0, connected, held, pressed, jx, jy, *accel, 0, 0, 0, 0, rx, ry)
 
 
 def write_scene(path, scene):
@@ -42,13 +44,29 @@ def main():
     game = Game(scene, seed=7)  # picks this round's parts into scene.slot_variants
     write_scene(out / "scene.bin", scene)
     seq = 0
+    view = None
+    if "--alia" in sys.argv[2:]:
+        import alia_engine
+        from alia_view import View
+        view = View(alia_engine.Engine(headless=True), scene)
+
+    def save(name, frame):
+        (out / f"{name}.frame").write_bytes(frame.pack(seq))
+        if view:
+            view.draw(frame)
+            view.e.screenshot(str(out / f"{name}.alia.png"))
+
+    def sky(name, t):
+        (out / f"{name}.sky").write_bytes(g3d.pack_sky(*world.sky_at(t)))
+        if view:
+            view.set_sky(*world.sky_at(t))
 
     def run(name, inputs):
         nonlocal seq
         frame = None
         for r in inputs:
             frame = game.step(r, DT)
-        (out / f"{name}.frame").write_bytes(frame.pack(seq))
+        save(name, frame)
         seq += 1
 
     run("1_ready", [raw()])
@@ -60,10 +78,9 @@ def main():
         game.step(raw(), DT)
         intro += 1
     run("2_fight_hint", [raw()])
-    # Walk forward and right for 1.5 s, then hold B while turning a little with tilt.
+    # Walk forward and right for 1.5 s, then hold B while turning a little with the right stick.
     walk = [raw(jx=40, jy=110)] * 30
-    tilt_right = (300, 0, 950)
-    shoot = [raw(held=g3d.BTN_B, accel=tilt_right)] * 6
+    shoot = [raw(held=g3d.BTN_B, rx=70)] * 6
     run("3_walk_shoot", walk + shoot)
     run("4_menu", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A), raw(jy=-110)])
     run("5_missing", [raw(connected=5)])
@@ -110,7 +127,7 @@ def main():
     for k in range(8):
         t = (k // 2) * period + (world.DAY_HOLD / 2 if k % 2 == 0 else world.DAY_HOLD + world.DAY_BLEND / 2)
         name = f"16_{k}_day_{t:04.0f}s"
-        (out / f"{name}.sky").write_bytes(g3d.pack_sky(*world.sky_at(t)))
+        sky(name, t)
         run(name, [raw()])
     # The stomp's dust ring halfway out, seen from 20 m (outside its reach)
     boss = game.boss
@@ -144,7 +161,7 @@ def main():
             frame = game.step(inputs() if inputs else raw(), DT)
             if done():
                 break
-        (out / f"{name}.frame").write_bytes(frame.pack(seq))
+        save(name, frame)
         seq += 1
 
     # Boss attacks on a fresh round (same seed, so the same parts as scene.bin).

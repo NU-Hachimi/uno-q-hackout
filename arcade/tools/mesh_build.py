@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Turn assets/ (meshes, palette, Looks) into sketch/gen/ and python/gen/.
 
+python/gen/meshes.bin is the mesh pack alia-engine loads (python/alia_view.py); the same
+triangles as sketch/gen/meshes.h:
+    "AMP1", u16 count, then per mesh: u8 id, u16 n_verts, u16 n_tris,
+    f32 xyz[n_verts], u16 tri[n_tris][3], u8 palette_index[n_tris]   (little-endian)
+
     python3 tools/mesh_build.py          (run from arcade/; rewrites the generated files)
     python3 tools/mesh_build.py --check  (exit 1 if the generated files are stale)
 
@@ -11,6 +16,7 @@ names and their Kd must match the palette colour (api.md §5.2, art.md §8).
 import argparse
 import json
 import math
+import struct
 import sys
 from pathlib import Path
 
@@ -265,7 +271,17 @@ def build():
     out += ["}", ""]
     looks_py = "\n".join(out)
 
+    pack = bytearray(b"AMP1" + struct.pack("<H", len(meshes)))
+    for mid in sorted(meshes):
+        mesh = meshes[mid][1]
+        colors = [g[0] for g in mesh["groups"] for _ in range(g[1])]
+        pack += struct.pack("<BHH", mid, len(mesh["verts"]), len(mesh["tris"]))
+        pack += struct.pack(f"<{3 * len(mesh['verts'])}f", *(c for v in mesh["verts"] for c in v))
+        pack += struct.pack(f"<{3 * len(mesh['tris'])}H", *(i for t in mesh["tris"] for i in t))
+        pack += bytes(colors)
+
     return {
+        ROOT / "python" / "gen" / "meshes.bin": bytes(pack),
         ROOT / "python" / "gen" / "looks.py": looks_py,
         ROOT / "sketch" / "gen" / "meshes.h": meshes_h,
         ROOT / "sketch" / "gen" / "palette.h": palette_h,
@@ -280,12 +296,13 @@ def main():
     parser.add_argument("--check", action="store_true", help="only report whether the outputs are up to date")
     args = parser.parse_args()
     stale = []
-    for path, text in build().items():
-        if not path.exists() or path.read_text() != text:
+    for path, data in build().items():
+        binary = isinstance(data, bytes)
+        if not path.exists() or (path.read_bytes() if binary else path.read_text()) != data:
             stale.append(path)
             if not args.check:
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(text)
+                path.write_bytes(data) if binary else path.write_text(data)
     for path in stale:
         print(("stale: " if args.check else "wrote: ") + str(path.relative_to(ROOT)))
     if args.check and stale:

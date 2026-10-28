@@ -8,8 +8,8 @@ from game import FIGHT, FIGHT_SPAWN, INTRO, MENU, MISSING, READY, READY_SPAWN, G
 DT = 0.05
 
 
-def raw(jx=0, jy=0, held=0, pressed=0, connected=7, accel=(0, 0, 1000)):
-    return g3d.RawInput(0, connected, held, pressed, jx, jy, *accel, 0, 0, 0, 0)
+def raw(jx=0, jy=0, held=0, pressed=0, connected=7, accel=(0, 0, 1000), rx=0, ry=0):
+    return g3d.RawInput(0, connected, held, pressed, jx, jy, *accel, 0, 0, 0, 0, rx, ry)
 
 
 def started():
@@ -24,7 +24,7 @@ def started():
 def test_ready_shows_prompt_and_a_starts():
     game = Game(world.make_scene(1))
     frame = game.step(raw(), DT)
-    assert game.state == READY and frame.hud.state == g3d.STATE_READY and frame.hud.msg == 12
+    assert game.state == READY and frame.hud.state == g3d.STATE_READY and frame.hud.msg == 1
     assert frame.objects == []  # the PC is drawn as rigs: horse and rider
     boss, horse, rider = frame.rigs
     assert (boss.rig_id, horse.rig_id, rider.rig_id) == (1, 3, 4) and horse.char_light and rider.char_light
@@ -136,30 +136,14 @@ def test_failed_frame_is_neutral_input():
     assert game.player.x == x0
 
 
-def test_tilt_is_rate_control_with_dead_zone():
+def test_right_stick_look_is_rate_control_with_dead_zone():
     controls = Controls()
-    controls.update(raw())
-    controls.calibrate()
-    tilt = lambda s: tuple(int(1000 * (a * s + n)) for a, n in zip(controls.yaw_axis, (0, 0, 1)))
-    for _ in range(20):  # let the low-pass filter settle
-        small = controls.update(raw(accel=tilt(0.05)))
-    assert small.yaw_rate == 0.0
-    for _ in range(20):
-        big = controls.update(raw(accel=tilt(0.4)))
-    assert big.yaw_rate > 0.5
-    for _ in range(20):
-        back = controls.update(raw())
-    assert back.yaw_rate == 0.0
-
-
-def test_axis_vector_parsing():
-    import pytest
-    from controls import axis_vector
-    assert axis_vector("x") == (1.0, 0.0, 0.0)
-    assert axis_vector("-y") == (0.0, -1.0, 0.0)
-    assert axis_vector("z", invert=True) == (0.0, 0.0, -1.0)
-    with pytest.raises(ValueError):
-        axis_vector("w")
+    assert controls.update(raw(rx=10)).yaw_rate == 0.0  # inside the dead zone
+    right = controls.update(raw(rx=127))
+    assert right.yaw_rate > 1.0 and right.pitch_rate == 0.0  # positive = turn right
+    up = controls.update(raw(ry=127))
+    assert up.pitch_rate > 0.5 and up.yaw_rate == 0.0        # positive = look up
+    assert controls.update(raw()).yaw_rate == 0.0
 
 
 def test_shooting_does_not_turn_the_horse():

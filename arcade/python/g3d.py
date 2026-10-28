@@ -176,6 +176,8 @@ class RawInput:
     gy: int
     render_ms: int
     push_ms: int
+    rx: int = 0      # right stick, -127..127, +x right, +y up (Alia Pad; not in the 16 B wire format)
+    ry: int = 0
 
 
 def unpack_input(data):
