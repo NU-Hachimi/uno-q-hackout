@@ -6,16 +6,21 @@ just before touchdown, so the rider lands straight in the saddle (art.md §2).
 
 The PC point (x, y, z) is the horse's hooves while riding or falling, and the rider's feet while the
 hook pulls it in or it clings to the boss (standing on the anchor, as before the horse).
+
+Both rigs are the player's own nodes in alia-engine's world, placed and posed every step; the saddle and
+the hand are read back from them.
 """
 
 import math
 import random
 from dataclasses import dataclass
 
+import alia_engine as ae
+
+import assets
 import camera
 import collide
 import g3d
-import rig
 import tilt_config as tilt
 import world
 from gen import mesh_ids, palette
@@ -59,15 +64,7 @@ LAND_ANIM = 0.35        # s of land_ride after touchdown
 FADE_OUT = 0.45         # s for the riderless horse to fade into the fog
 FADE_IN = 0.4           # s before touchdown that the horse fades back in under the rider
 RIDER_ROOT_Y = RIDER["bones"][0]["offset"][1]
-
-
-def _saddle(anim, phase):
-    """Saddle position in horse rig space."""
-    return rig.transform(rig.attach_matrix(HORSE, rig.pose(HORSE, anim, phase), "saddle"), (0, 0, 0))
-
-
-# Rider origin above the hooves while mounted on a standing horse; a falling PC keeps this offset.
-MOUNT_DROP = _saddle(HORSE_ANIM["stand"], 0)[1] - RIDER_ROOT_Y
+SADDLE_TILT = True      # mounted, the rider hangs on the saddle (and leans with the horse's back); False: upright above it
 
 
 @dataclass
@@ -104,8 +101,10 @@ def _wrap(angle):
 
 
 class Player:
-    def __init__(self, scene, x=0.0, z=-30.0, yaw=0.0, seed=None):
+    def __init__(self, scene, w, x=0.0, z=-30.0, yaw=0.0, seed=None):
+        """`w`: the alia_engine.World the horse and the rider live in (assets.load() first)."""
         self.scene = scene
+        self.w = w
         self.x, self.z, self.yaw = x, z, yaw
         self.y = world.terrain_height(scene, x, z)
         self.hp = HP_MAX
@@ -135,6 +134,24 @@ class Player:
         self.anim_override = None  # (anim, phase) for the rider while finisher.py runs the finisher
         self.loose = None        # (x, y, z, yaw, speed) of the riderless horse as the rider left it
         self.loose_time = 0.0
+        horse, rider = assets.RIGS[HORSE["name"]], assets.RIGS[RIDER["name"]]
+        # Rider origin above the hooves while mounted on a standing horse; a falling PC keeps this offset.
+        self.mount_drop = horse.attach_position("saddle", HORSE_ANIM["stand"], 0)[1] - RIDER_ROOT_Y
+        self.horse, self.rider = w.spawn_rig(horse), w.spawn_rig(rider)
+        for node in (self.horse, self.rider):
+            node.set_subtree(light=ae.Light.CHARACTER)
+        self.saddle, self.hand_point = self.horse.attach_point("saddle"), self.rider.attach_point("hand")
+        self._horse_fade = 0.0
+        self._on_saddle = False
+        self.present()
+        for node in (self.horse, self.rider):
+            node.teleport()  # spawned at the origin: no slide from there
+
+    def close(self):
+        """Take the horse and the rider out of the world (a new round makes a new PC)."""
+        for node in (self.horse, self.rider):
+            if node.alive:
+                node.destroy()
 
     @property
     def hooked(self):
@@ -182,15 +199,48 @@ class Player:
         if self.hook in (PULLING, HOOKED):  # feet on the PC point
             return self.x, self.y, self.z
         if self.airborne:
-            return self.x, self.y + MOUNT_DROP, self.z
-        sx, sy, sz = rig.transform(rig.rig_to_world(self.x, self.y, self.z, self.yaw), _saddle(*self._horse_anim()))
+            return self.x, self.y + self.mount_drop, self.z
+        self._place_horse()  # mounted: the horse stands on the PC point
+        if SADDLE_TILT:
+            self._place_rider()
+            return self.rider.world_position
+        sx, sy, sz = self.saddle.world_position
         return sx, sy - RIDER_ROOT_Y, sz
 
     def hand(self):
         """World position of the rider's `hand` attach (shots and the rope start here)."""
-        world_rig = rig.rig_to_world(*self._rider_origin(), self.yaw)
-        poses = rig.pose(RIDER, *self._rider_anim())
-        return rig.transform(rig.compose(world_rig, rig.attach_matrix(RIDER, poses, "hand")), (0, 0, 0))
+        self._place_rider()
+        return self.hand_point.world_position
+
+    def _place_horse(self):
+        """The horse node follows _horse_block(): out of the world when there is none."""
+        block = self._horse_block()
+        node = self.horse
+        node.active = block is not None
+        if block is not None:
+            node.position, node.yaw = (block.x, block.y, block.z), block.yaw
+            node.animator.anim, node.animator.phase = block.anim, block.phase
+            if self._horse_fade != block.fade:
+                node.set_subtree(fade=block.fade)
+                self._horse_fade = block.fade
+
+    def _place_rider(self):
+        node = self.rider
+        node.animator.anim, node.animator.phase = self._rider_anim()
+        on = SADDLE_TILT and self.mounted
+        if on != self._on_saddle:  # mounting or leaving: stay put in the world, so the step still blends
+            node.set_parent(self.saddle if on else None, keep_world=True)
+            self._on_saddle = on
+        if on:  # the root bone on the saddle; the horse's heading and lean come from the parent
+            self._place_horse()
+            node.position, node.rotation = (0.0, -RIDER_ROOT_Y, 0.0), (0.0, 0.0, 0.0, 1.0)
+        else:
+            node.position, node.yaw = self._rider_origin(), self.yaw
+
+    def present(self):
+        """Once a step: the horse and the rider show this step's state."""
+        self._place_horse()
+        self._place_rider()
 
     def update(self, inp, cam, dt, boss, aim):
         """C fires or releases the hook; the stick walks (on the ground only); B shoots along `aim`."""
@@ -257,7 +307,7 @@ class Player:
     def _hook_button(self, aim, boss):
         if self.hook in (PULLING, HOOKED):  # let go and drop; from here the PC point is the hooves again
             ox, oy, oz = self._rider_origin()
-            self.x, self.y, self.z = ox, oy - MOUNT_DROP, oz
+            self.x, self.y, self.z = ox, oy - self.mount_drop, oz
             self.hook, self.airborne, self.loose_time = None, True, 0.0
             self.vx = self.vy = self.vz = 0.0
             return
@@ -330,7 +380,7 @@ class Player:
         if self.hook not in (PULLING, HOOKED):
             return False
         ox, oy, oz = self._rider_origin()
-        self.x, self.y, self.z = ox, oy - MOUNT_DROP, oz
+        self.x, self.y, self.z = ox, oy - self.mount_drop, oz
         self.hook, self.airborne, self.loose_time = None, True, 0.0
         self.vx, self.vy, self.vz = away[0] * speed, up, away[1] * speed
         self.hp = max(0, self.hp - damage)

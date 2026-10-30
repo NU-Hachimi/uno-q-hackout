@@ -153,7 +153,7 @@ class Boss:
         order += [node.slot(i) for i in range(len(self.rig["slots"]))]
         self.rank = {n: k for k, n in enumerate(order)}
         self.shins = {c for i, n in enumerate(names) if n.startswith("shin") for c in node.colliders(i)}
-        self._shown = {"hidden": False, "fade": 0.0}  # what present() last gave the node
+        self._shown = {"fade": 0.0, "flash": -1}  # what present() last gave the node
 
     def close(self):
         """Take the rig out of the world (a new round spawns a new boss)."""
@@ -362,30 +362,19 @@ class Boss:
         return out
 
     def present(self):
-        """Once a step, what the rig shows: hidden while faded out, the broken parts gone, the part just hit
-        flashing."""
-        node, shown = self._place(), self._shown
-        hidden = self.fade >= 1
-        if hidden != shown["hidden"]:
-            node.set_subtree(visible=not hidden)
-            if not hidden:  # back: no slide from where it was hidden, and the parts below start over
-                node.teleport()
-                shown.clear()
-            shown["hidden"] = hidden
-        if hidden:
-            return
-        if shown.get("fade") != self.fade:
-            node.set_subtree(fade=self.fade)  # not visible: broken parts stay hidden
-            shown["fade"] = self.fade
+        """Once a step, what the rig shows: its fade (1: in the fog, not drawn, still there to hit) and the
+        part just hit flashing. Broken parts are out of the world already (_break)."""
+        node = self._place()
+        if self._shown["fade"] != self.fade:
+            node.set_subtree(fade=self.fade)
+            self._shown["fade"] = self.fade
         flash = self.hit_slot if self.hit_timer > 0 else -1
-        for slot, variant in enumerate(self.variants):
-            want = (bool(self.alive & (1 << slot)), slot == flash)
-            if not variant or shown.get(slot) == want:
-                continue
-            part = node.slot(slot)
-            part.visible = want[0]
-            part.tint, part.ground_fog = (palette.FLASH, False) if want[1] else (0, True)
-            shown[slot] = want
+        if self._shown["flash"] != flash:
+            for slot, tint, fog in ((self._shown["flash"], 0, True), (flash, palette.FLASH, False)):
+                if slot >= 0:
+                    part = node.slot(slot)
+                    part.tint, part.ground_fog = tint, fog
+            self._shown["flash"] = flash
 
     # ---- damage -------------------------------------------------------------------------------
     def damageable(self, slot, hooked=False):
@@ -422,7 +411,7 @@ class Boss:
     def _break(self, slot):
         self.alive &= ~(1 << slot)
         part = self.node.slot(slot)
-        part.collider_enabled = False
+        part.active = False  # out of the world: not drawn, its collider off
         self._cache = None
         mesh = self.rig["slots"][slot]["variants"][self.variants[slot]] or ""
         self.broken.append((slot, self.position_of(part), part_tint(mesh)))

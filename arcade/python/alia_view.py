@@ -16,12 +16,10 @@ from pathlib import Path
 
 import alia_engine as ae
 
-import assets
 import g3d
 import world
 from gen import mesh_ids
 from gen import palette as pal
-from gen.rigs import RIGS
 
 MESH_PACK = Path(__file__).resolve().parent / "gen" / "meshes.apak"  # alia-engine resource pack (tools/mesh_build.py)
 _LOOK = struct.Struct("<32HBBBbBHHBBB")
@@ -120,8 +118,6 @@ class View:
         # rebuilt when the sky changes, the node stays) and the scattered rocks. Moving things are still
         # drawn per frame until the rigs move into the engine too (E4 step 4).
         engine.world.spawn(self.terrain)
-        self.rigs = assets.load(engine)  # by name; the Frame names rigs by id (gen.rigs)
-        self.rig_nodes = {}  # block index -> [rig id, RigNode, hidden, fade, char_light]
         self.pool = {}       # mesh id -> nodes for this kind of object
         self.rope_node = None
         for x, z, yaw, scale, mesh_id, tint in scene.rocks:
@@ -190,8 +186,9 @@ class View:
         self._terrain_mesh(grade(fields["grass_a"], params), grade(fields["grass_b"], params))
 
     # ---- one frame ------------------------------------------------------------------------------
-    def update(self, frame):
-        """Every logic step: the world follows this step's Frame (alia-engine interpolates between steps)."""
+    def update(self, frame, hand=None):
+        """Every logic step: the world follows this step's Frame (alia-engine interpolates between steps);
+        `hand`, the rider's hand, is where the rope starts."""
         e, f, cam = self.e, self.e.frame, frame.camera
         c = e.world.camera
         c.position, c.yaw, c.pitch, c.fov_x = (cam.x, cam.y, cam.z), cam.yaw, cam.pitch, math.radians(cam.fov)
@@ -204,44 +201,13 @@ class View:
         f.character.ambient, f.character.diffuse = CHAR_AMBIENT, CHAR_DIFFUSE
         f.overlay = rgba(pal.PALETTE_565[pal.HURT], HURT_ALPHA) if frame.flags & g3d.FLAG_HURT else 0
 
-        hand = None
-        for k, block in enumerate(frame.rigs[1:], 1):  # the boss is its own rig (boss.py), not the Frame's
-            hand = self._rig(k, block) or hand
-        self._objects(frame.objects)
+        self._objects(frame.objects)  # the rigs are the boss's and the player's own nodes
         self._rope(frame.hook, hand, cam)
 
     def draw(self, frame):
         """Every displayed frame: the HUD (the world draws itself)."""
         if not frame.flags & g3d.FLAG_NO_HUD:
             self._hud(frame.hud)
-
-    def _rig(self, k, block):
-        """Rig block k (1 horse, 2 rider) as an engine rig; returns the rider's hand position, if any."""
-        state = self.rig_nodes.get(k)
-        if block is None or block.rig_id not in RIGS or block.fade >= 1:
-            if state and not state[2]:
-                state[1].set_subtree(visible=False)
-                state[2] = True
-            return None
-        if state is None or state[0] != block.rig_id:
-            if state:
-                state[1].destroy()
-            node = self.e.world.spawn_rig(self.rigs[RIGS[block.rig_id]["name"]])
-            state = self.rig_nodes[k] = [block.rig_id, node, True, None, None]
-        node = state[1]
-        node.position, node.yaw = (block.x, block.y, block.z), block.yaw
-        node.animator.anim, node.animator.phase = block.anim, block.phase
-        light = ae.Light.CHARACTER if block.char_light else ae.Light.MATERIAL
-        if state[2]:  # back from hidden (the horse fading in under the rider): show it, no slide from where it was
-            node.set_subtree(visible=True)
-            node.teleport()
-            state[2] = False
-        if state[3] != block.fade or state[4] != light:
-            node.set_subtree(fade=block.fade, light=light)  # not visible: dead parts stay hidden
-            state[3], state[4] = block.fade, light
-        if "hand" in RIGS[block.rig_id].get("attach", {}):
-            return node.attach_point("hand").world_position
-        return None
 
     def _objects(self, objects):
         """Bullets, sparks, the hook head, dust rings: pooled nodes by mesh. Objects have no identity from

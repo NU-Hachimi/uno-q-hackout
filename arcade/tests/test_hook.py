@@ -45,7 +45,7 @@ def step(pc, boss, inp=Input(), view=None):
 
 def test_hook_flies_pulls_and_rides_the_bone():
     scene, boss = setup()
-    pc = Player(scene, x=0.0, z=-14.0)
+    pc = Player(scene, W, x=0.0, z=-14.0)
     view, brow = hook_view(boss, pc)
     a = step(pc, boss, view=view)
     assert a.flags & aim.FLAG_HOOK and a.hook.collider.kind == "hook"
@@ -69,14 +69,14 @@ def test_hook_flies_pulls_and_rides_the_bone():
 def test_only_the_back_and_the_brow_take_the_hook():
     scene, boss = setup()
     hump, brow = boss.hook_targets()
-    pc = Player(scene, x=14.0, z=0.0)  # beside the boss: both in view
+    pc = Player(scene, W, x=14.0, z=0.0)  # beside the boss: both in view
     for target in (hump, brow):
         a = step(pc, boss, view=look_at(pc, target.centre()))
         assert a.flags & aim.FLAG_HOOK and a.hook.collider == target
     legs = next(c for c in boss.colliders() if c.kind == "body" and c.bone == 3)  # a foreleg
     a = step(pc, boss, view=look_at(pc, legs.centre()))
     assert not a.flags & aim.FLAG_HOOK
-    behind = Player(scene, x=0.0, z=14.0)  # behind it: the body hides the brow
+    behind = Player(scene, W, x=0.0, z=14.0)  # behind it: the body hides the brow
     a = step(behind, boss, view=look_at(behind, brow.centre()))
     assert not (a.hook and a.hook.collider == brow)
 
@@ -97,7 +97,7 @@ def test_on_the_brow_the_view_tilts_further_down_and_eases_back_after():
 
 def test_letting_go_falls_to_the_ground():
     scene, boss = setup()
-    pc = Player(scene, x=0.0, z=-14.0)
+    pc = Player(scene, W, x=0.0, z=-14.0)
     view, _ = hook_view(boss, pc)
     step(pc, boss, Input(pressed=g3d.BTN_C), view)
     for _ in range(80):
@@ -112,7 +112,7 @@ def test_letting_go_falls_to_the_ground():
 
 def test_a_miss_comes_back():
     scene, boss = setup()
-    pc = Player(scene, x=0.0, z=-14.0)
+    pc = Player(scene, W, x=0.0, z=-14.0)
     view = g3d.Camera(pc.x, pc.y + 2.5, pc.z, yaw=math.pi, fov=camera.FOV)  # facing away from the boss
     a = step(pc, boss, Input(pressed=g3d.BTN_C), view)
     assert not a.flags & aim.FLAG_HOOK and pc.hook == "flying"
@@ -124,7 +124,7 @@ def test_a_miss_comes_back():
 def test_hooked_shots_do_double_damage():
     scene, boss = setup()
     back = next(s for s in boss.parts if s not in boss.legs)
-    pc = Player(scene)
+    pc = Player(scene, W)
     pc.hook = HOOKED
     part = next(c for c in boss.colliders() if c.slot == back)
     eye = part.centre()[0], part.centre()[1] + 4, part.centre()[2] + 1
@@ -137,7 +137,7 @@ def test_hooked_shots_do_double_damage():
 
 def test_cannot_be_hurt_while_riding_the_hook():
     scene, boss = setup()
-    pc = Player(scene)
+    pc = Player(scene, W)
     pc.hook = PULLING
     assert not pc.hurt(1) and pc.hp == 5
     pc.hook = None

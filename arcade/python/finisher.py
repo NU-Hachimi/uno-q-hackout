@@ -13,8 +13,8 @@ The boss has no `die` animation yet, so it holds its pose (or kneels) and sinks 
 import math
 
 import aim
+import assets
 import g3d
-import rig
 import world
 from controls import Input
 from gen import mesh_ids, palette
@@ -53,8 +53,7 @@ class Finisher:
         self.hit_phase, self.shatter_phase = sparks[0], sparks[-1]
         self.land_phase = 255 * LAND_KEY / (anim["keys"] - 1)
         # Where the hand is at the hit, relative to the rider's feet: the feet go there minus this offset.
-        poses = rig.pose(RIDER, self.anim_id, self.hit_phase)
-        self.hand_at_hit = rig.transform(rig.attach_matrix(RIDER, poses, "hand"), (0, 0, 0))
+        self.hand_at_hit = assets.RIGS[RIDER["name"]].attach_position("hand", self.anim_id, self.hit_phase)
         self.boss_anims = {a["name"] for a in boss.rig["anims"]}
         self.phase = 0.0          # rider animation phase, 0..255, as a float
         self.time = 0.0           # s of game time since B
@@ -73,9 +72,7 @@ class Finisher:
         return self.game.boss.attach_position("head_weak")
 
     def _hand(self):
-        player = self.game.player
-        poses = rig.world_poses(RIDER, self.anim_id, int(self.phase), player.x, player.y, player.z, player.yaw)
-        return rig.transform(rig.attach_matrix(RIDER, poses, "hand"), (0, 0, 0))
+        return self.game.player.hand()  # the rider plays the finisher (anim_override), feet on the PC point
 
     def speed(self):
         """Game-time rate: 0 in the hit stop, SLOW from the hit to the shatter, else 1."""
@@ -118,7 +115,9 @@ class Finisher:
     def _place_rider(self):
         """The rider's feet: from the hook anchor onto the weak point over keys 0-3, then on it."""
         game, boss, player = self.game, self.game.boss, self.game.player
-        hand = rig.transform_dir(rig.rig_to_world(0, 0, 0, player.yaw), self.hand_at_hit)
+        hx, hy, hz = self.hand_at_hit  # turned by the rider's heading (Ry)
+        c, s = math.cos(player.yaw), math.sin(player.yaw)
+        hand = (hx * c + hz * s, hy, -hx * s + hz * c)
         weak = self.weak_point()
         land = (weak[0] - hand[0], weak[1], weak[2] - hand[2])
         k = _ease(self.phase / self.land_phase)

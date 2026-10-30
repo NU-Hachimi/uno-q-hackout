@@ -92,9 +92,9 @@ class Game:
         self.scene.slot_variants = pick_parts(self.rng)
         self.scene_version += 1
         if getattr(self, "boss", None):
-            self.boss.close()
+            self.close()
         self.boss = Boss(self.scene, self.w, random.Random(self.rng.random()))
-        self.player = Player(self.scene, *READY_SPAWN, yaw=math.pi / 2, seed=self.rng.random())  # riding towards +X
+        self.player = Player(self.scene, self.w, *READY_SPAWN, yaw=math.pi / 2, seed=self.rng.random())  # riding towards +X
         self.ready_to = READY_TURNS
         self.camera = ThirdPersonCamera(self.player.yaw)
         self.boss.fade = 1.0  # out of the scene until the intro
@@ -136,11 +136,13 @@ class Game:
         elif self.state in (WIN, LOSE) and inp.pressed & BTN_A:
             self.restart()
         self.boss.present()
+        self.player.present()
         return self._frame()
 
     def close(self):
         """Take the round out of the world."""
         self.boss.close()
+        self.player.close()
 
     def _ready(self, inp, dt):
         self.boss.idle(dt)

@@ -32,7 +32,7 @@ def make_boss(seed=1):
 
 def test_stands_still_until_it_attacks():
     scene, boss = make_boss()
-    pc = Player(scene, x=40.0, z=0.0)  # to the side, 40 m: outside attack and charge range
+    pc = Player(scene, W, x=40.0, z=0.0)  # to the side, 40 m: outside attack and charge range
     yaw = boss.yaw
     for _ in range(200):
         boss.update(0.05, pc)
@@ -41,7 +41,7 @@ def test_stands_still_until_it_attacks():
 
 def test_attack_turns_slowly_then_strikes_and_hurts():
     scene, boss = make_boss()
-    pc = Player(scene, x=8.0, z=0.0)  # inside range, 90 degrees to the boss's left of facing
+    pc = Player(scene, W, x=8.0, z=0.0)  # inside range, 90 degrees to the boss's left of facing
     boss.timer = 0.0
     boss.update(0.05, pc)
     assert boss.state == TURNING
@@ -61,8 +61,8 @@ def test_attack_turns_slowly_then_strikes_and_hurts():
 
 def test_hit_event_hurts_only_in_range_and_not_while_hooked():
     scene, boss = make_boss()
-    near = Player(scene, x=0.0, z=-4.0)
-    far = Player(scene, x=0.0, z=-30.0)
+    near = Player(scene, W, x=0.0, z=-4.0)
+    far = Player(scene, W, x=0.0, z=-30.0)
     for pc, expect in ((near, True), (far, False)):
         boss.state, boss.attack = STRIKING, "sweep"
         boss.play("sweep")
@@ -71,7 +71,7 @@ def test_hit_event_hurts_only_in_range_and_not_while_hooked():
         pc.y = head[1] - 0.9 if expect else pc.y
         boss._events(0, 255, pc)
         assert (pc.hp < 5) == expect
-    hooked = Player(scene, x=0.0, z=-4.0)
+    hooked = Player(scene, W, x=0.0, z=-4.0)
     hooked.hook = "hooked"
     boss._events(0, 255, hooked)
     assert hooked.hp == 5
@@ -83,7 +83,7 @@ def test_both_legs_kneel_then_back_exposes_the_weak_point():
     first = boss.legs[0]
     assert not boss.damage(first, 1)
     assert boss.hit_slot == first and boss.rig_block().hit_slot == first
-    boss.update(0.2, Player(scene))
+    boss.update(0.2, Player(scene, W))
     assert boss.rig_block().hit_slot == 0xFF  # the flash lasts 0.1 s
     for slot in boss.legs:
         boss.damage(slot, 99)
@@ -99,7 +99,7 @@ def test_kneeling_boss_does_not_attack():
     scene, boss = make_boss()
     for slot in boss.legs:
         boss.damage(slot, 99)
-    pc = Player(scene, x=0.0, z=-5.0)
+    pc = Player(scene, W, x=0.0, z=-5.0)
     boss.timer = 0
     for _ in range(100):
         boss.update(0.05, pc)
@@ -108,7 +108,7 @@ def test_kneeling_boss_does_not_attack():
 
 def test_weak_point_is_not_shot_and_the_finisher_needs_the_hook():
     scene, boss = make_boss(seed=2)
-    pc = Player(scene)
+    pc = Player(scene, W)
     for slot in boss.parts:
         boss.damage(slot, 99)
     assert boss.weak_exposed()
@@ -138,7 +138,7 @@ def test_aim_assist_snaps_to_a_visible_part():
 def test_shooting_a_part_until_it_breaks():
     scene, boss = make_boss(seed=5)
     slot = boss.parts[0]
-    pc = Player(scene, x=0.0, z=-30.0)
+    pc = Player(scene, W, x=0.0, z=-30.0)
     eye = vantage(boss, slot)
     hits = 0
     for _ in range(80):
@@ -164,14 +164,14 @@ def test_feet_block_the_pc_but_the_belly_does_not():
     feet = boss.feet()
     assert len(feet) == 4
     fx, fz, r = feet[0]
-    pc = Player(scene, x=fx, z=fz - 3)
+    pc = Player(scene, W, x=fx, z=fz - 3)
     from controls import Input
     for _ in range(40):  # walk straight at the foot
         view = g3d.Camera(pc.x, 2, pc.z - 6, yaw=0.0)
         pc.update(Input(move_y=1.0), camera.ThirdPersonCamera(0.0), 0.05, boss,
                   aim.Aim((0, 0, 0), (0, 0, 1)))
         assert math.hypot(pc.x - fx, pc.z - fz) >= r - 1e-6
-    pc = Player(scene, x=0.0, z=0.0)  # right under the torso
+    pc = Player(scene, W, x=0.0, z=0.0)  # right under the torso
     pc.update(Input(), camera.ThirdPersonCamera(0.0), 0.05, boss, aim.Aim((0, 0, 0), (0, 0, 1)))
     assert (pc.x, pc.z) == (0.0, 0.0)
 
@@ -189,21 +189,21 @@ def stomp(boss, pc, seconds=3.0):
 
 def test_stomp_ring_hurts_pc_on_the_ground_inside_its_radius():
     scene, boss = make_boss()
-    pc = Player(scene, x=0.0, z=-10.0)
+    pc = Player(scene, W, x=0.0, z=-10.0)
     assert stomp(boss, pc) == 1
     assert pc.hp == 4 and boss.waves == []
 
 
 def test_stomp_ring_misses_pc_outside_its_radius():
     scene, boss = make_boss()
-    pc = Player(scene, x=0.0, z=-20.0)
+    pc = Player(scene, W, x=0.0, z=-20.0)
     stomp(boss, pc)
     assert pc.hp == 5
 
 
 def test_stomp_ring_misses_pc_off_the_ground():
     scene, boss = make_boss()
-    pc = Player(scene, x=0.0, z=-10.0)
+    pc = Player(scene, W, x=0.0, z=-10.0)
     pc.airborne = True
     stomp(boss, pc)
     assert pc.hp == 5
@@ -211,7 +211,7 @@ def test_stomp_ring_misses_pc_off_the_ground():
 
 def test_stomp_ring_is_drawn_growing_on_the_ground():
     scene, boss = make_boss()
-    pc = Player(scene, x=0.0, z=-30.0)
+    pc = Player(scene, W, x=0.0, z=-30.0)
     boss.state, boss.attack = STRIKING, "rear_stomp"
     boss.play("rear_stomp")
     scales = []
@@ -225,7 +225,7 @@ def test_stomp_ring_is_drawn_growing_on_the_ground():
 def test_far_pc_gets_charged_after_a_paw_wind_up():
     from boss import CHARGING, PAWING
     scene, boss = make_boss()
-    pc = Player(scene, x=0.0, z=-25.0)  # in front, beyond kicking range
+    pc = Player(scene, W, x=0.0, z=-25.0)  # in front, beyond kicking range
     boss.timer = 0.0
     states, start = [], (boss.x, boss.z)
     for _ in range(120):
@@ -242,7 +242,7 @@ def test_far_pc_gets_charged_after_a_paw_wind_up():
 def test_charge_heading_locks_so_a_sidestep_dodges_it():
     from boss import CHARGING
     scene, boss = make_boss()
-    pc = Player(scene, x=0.0, z=-25.0)
+    pc = Player(scene, W, x=0.0, z=-25.0)
     boss.timer = 0.0
     while boss.state != CHARGING:
         boss.update(0.05, pc)
@@ -257,7 +257,7 @@ def test_charge_heading_locks_so_a_sidestep_dodges_it():
 def test_near_pc_is_not_charged():
     from boss import CHARGING, PAWING
     scene, boss = make_boss()
-    pc = Player(scene, x=0.0, z=-10.0)
+    pc = Player(scene, W, x=0.0, z=-10.0)
     boss.timer = 0.0
     for _ in range(80):
         boss.update(0.05, pc)
@@ -266,7 +266,7 @@ def test_near_pc_is_not_charged():
 
 def test_close_pc_gets_the_stomp_and_the_ring_hurts():
     scene, boss = make_boss()
-    pc = Player(scene, x=0.0, z=-5.0)  # under the boss's chest
+    pc = Player(scene, W, x=0.0, z=-5.0)  # under the boss's chest
     boss.timer = 0.0
     attack, hurt_at = None, None
     for i in range(70):  # the stomp lands at 1.6 s and its ring is gone 1.2 s later, before the next attack
@@ -280,7 +280,7 @@ def test_close_pc_gets_the_stomp_and_the_ring_hurts():
 
 def test_the_ring_spares_a_hooked_pc():
     scene, boss = make_boss()
-    pc = Player(scene, x=0.0, z=-6.0)
+    pc = Player(scene, W, x=0.0, z=-6.0)
     pc.hook = "hooked"
     boss.waves = [[0.0, 0.0, 0.0, 0.0, 12.0, 1]]
     for _ in range(40):
@@ -289,7 +289,7 @@ def test_the_ring_spares_a_hooked_pc():
 
 
 def hooked_pc(scene, boss):
-    pc = Player(scene, x=3.0, z=0.0)
+    pc = Player(scene, W, x=3.0, z=0.0)
     pc.y = boss.y + 7.0
     pc.hook = "hooked"
     return pc
@@ -321,7 +321,7 @@ def test_shake_throws_off_a_pc_that_holds_on():
 
 def test_kneels_then_rises_then_kneels_again_after_damage():
     scene, boss = make_boss(seed=4)
-    pc = Player(scene, x=0.0, z=-40.0)
+    pc = Player(scene, W, x=0.0, z=-40.0)
     for slot in boss.legs:
         boss.damage(slot, 99)
     assert boss.state == KNEELING
@@ -342,7 +342,7 @@ def test_kneel_camera_shake_event_fires():
     scene, boss = make_boss()
     for slot in boss.legs:
         boss.damage(slot, 99)
-    pc = Player(scene, x=0.0, z=-40.0)
+    pc = Player(scene, W, x=0.0, z=-40.0)
     for _ in range(60):
         boss.update(0.05, pc)
     assert boss.shake > 0
