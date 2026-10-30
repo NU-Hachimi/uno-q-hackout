@@ -66,7 +66,7 @@ def shoot(engine, view, game, path, hud=True, steps=1, inputs=raw):
     if not hud:
         frame.flags |= screen.FLAG_NO_HUD
     view.set_sky(*terrain.sky_at(game.day))
-    view.update(frame, game.player.hand())
+    view.update(frame)
     view.draw(frame)
     engine.end_frame()
     engine.screenshot(str(path))

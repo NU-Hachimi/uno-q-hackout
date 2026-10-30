@@ -121,7 +121,9 @@ class Game:
         elif self.state in (WIN, LOSE) and inp.pressed & GO:
             self.restart()
         self.boss.present()
-        self.player.present()
+        self.player.present(rope=self.state != EXECUTE)  # the finisher has the hook in the rider's hand
+        if self.finisher:
+            self.finisher.present()
         self.sounds = self.boss.sounds + self.player.sounds  # since the last step, for sfx.py
         self.boss.sounds, self.player.sounds = [], []
         return self._frame()
@@ -130,6 +132,8 @@ class Game:
         """Take the round out of the world."""
         self.boss.close()
         self.player.close()
+        if self.finisher:
+            self.finisher.close()
 
     def _ready(self, inp, dt):
         self.boss.idle(dt)

@@ -21,6 +21,7 @@ import alia_engine as ae
 
 import assets
 import collide
+from shown import Shown
 import screen
 import terrain
 from gen import mesh_ids, palette
@@ -155,11 +156,13 @@ class Boss:
         self.rank = {n: k for k, n in enumerate(order)}
         self.shins = {c for i, n in enumerate(names) if n.startswith("shin") for c in node.colliders(i)}
         self._shown = {"fade": 0.0, "flash": -1}  # what present() last gave the node
+        self.shown = Shown(self.w)  # the dust rings (objects())
 
     def close(self):
         """Take the rig out of the world (a new round spawns a new boss)."""
         if self.node.alive:
             self.node.destroy()
+        self.shown.close()
 
     # ---- animation -----------------------------------------------------------------------
     def play(self, name):
@@ -367,6 +370,7 @@ class Boss:
         """Once a step, what the rig shows: its fade (1: in the fog, not drawn, still there to hit) and the
         part just hit flashing. Broken parts are out of the world already (_break)."""
         node = self._place()
+        self.shown.sync(self.objects())
         if self._shown["fade"] != self.fade:
             node.set_subtree(fade=self.fade)
             self._shown["fade"] = self.fade

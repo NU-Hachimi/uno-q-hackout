@@ -14,6 +14,7 @@ import math
 
 import aim
 import assets
+from shown import Shown
 import screen
 import terrain
 from controls import Input
@@ -58,6 +59,7 @@ class Finisher:
         self.flash = 0.0          # s of hand flash left
         self.after = None         # s of game time since the shatter
         self.dropped = False
+        self.shown = Shown(game.w)  # the hand flash (objects())
         weak, anchor = self.weak_point(), player.anchor(boss)
         dx, dz = weak[0] - anchor[0], weak[2] - anchor[2]
         player.yaw = math.atan2(dx, dz) if math.hypot(dx, dz) > 0.2 else boss.yaw + math.pi
@@ -142,6 +144,12 @@ class Finisher:
 
     def _burst(self, n):
         self.game.player.orbs.burst(n, at=self._hand())
+
+    def present(self):
+        self.shown.sync(self.objects())
+
+    def close(self):
+        self.shown.close()
 
     def objects(self):
         """The hand flash (the sparks are particles, effects.py). Drawn with the `spark` mesh until the renderer

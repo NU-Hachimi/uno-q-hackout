@@ -20,6 +20,7 @@ import alia_engine as ae
 import assets
 import camera
 import collide
+from shown import Shown
 import controls
 import screen
 import tuning
@@ -129,6 +130,8 @@ class Player:
         seed = self.rng.randrange(1 << 30)
         self.hits, self.debris_fx, self.orbs = (w.spawn_emitter(assets.PARTICLES[name], seed=seed + k)
                                                 for k, name in enumerate(("hit", "debris", "orbs")))
+        self.shown = Shown(w)  # the bullets and the hook head (objects())
+        self.rope = w.spawn(assets.ROPE, active=False)
         self._horse_fade = 0.0
         self._on_saddle = False
         self.present()
@@ -137,9 +140,10 @@ class Player:
 
     def close(self):
         """Take the horse and the rider out of the world (a new round makes a new PC)."""
-        for node in (self.horse, self.rider, self.hits, self.debris_fx, self.orbs):
+        for node in (self.horse, self.rider, self.hits, self.debris_fx, self.orbs, self.rope):
             if node.alive:
                 node.destroy()
+        self.shown.close()
 
     @property
     def hooked(self):
@@ -225,10 +229,25 @@ class Player:
         else:
             node.position, node.yaw = self._rider_origin(), self.yaw
 
-    def present(self):
-        """Once a step: the horse and the rider show this step's state."""
+    def present(self, rope=True):
+        """Once a step: the horse, the rider, the bullets, the hook head and the rope show this step's state
+        (rope False: the finisher has the hook in the rider's hand)."""
         self._place_horse()
         self._place_rider()
+        self.shown.sync(self.objects())
+        self._place_rope(rope and self.hook is not None)
+
+    def _place_rope(self, shown):
+        """The rope: the thin box (assets.ROPE, 2 m along +Z) from the hand to the hook head."""
+        hand = self.hand() if shown else None
+        d = tuple(b - a for a, b in zip(hand, self.hook_head)) if shown else (0.0, 0.0, 0.0)
+        length = math.sqrt(sum(c * c for c in d))
+        self.rope.active = shown and length > 1e-3
+        if self.rope.active:
+            self.rope.position = tuple((a + b) / 2 for a, b in zip(hand, self.hook_head))
+            self.rope.set_rotation(math.atan2(d[0], d[2]), -math.atan2(d[1], math.hypot(d[0], d[2])), 0.0)
+            self.rope.scale = (1.0, 1.0, length / 2)
+            self.rope.teleport()  # it follows the hand and the hook, which jump about
 
     def update(self, inp, cam, dt, boss, aim):
         """C fires or releases the hook; the stick walks (on the ground only); B shoots along `aim`."""

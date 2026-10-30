@@ -94,7 +94,7 @@ def main():
     def save(name, frame):
         (out / f"{name}.state.json").write_text(json.dumps(state_of(game, frame), indent=1, sort_keys=True) + "\n")
         if view:
-            view.update(frame, game.player.hand())
+            view.update(frame)
             view.draw(frame)
             view.e.end_frame()
             view.e.screenshot(str(out / f"{name}.alia.png"))
