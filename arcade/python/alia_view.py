@@ -118,6 +118,11 @@ class View:
         self.meshes = self._load_meshes()
         self.rope = 0
         self.terrain = 0
+        # Terrain colours are baked with their shading; the rope is a flat ribbon that never sinks into
+        # the ground fog (alia-engine materials, its docs/api.md §2).
+        self.ground_material = engine.create_material(ae.Material(shading=ae.Shading.UNLIT, color=ae.ColorSource.VERTEX))
+        self.rope_material = engine.create_material(ae.Material(shading=ae.Shading.UNLIT, color=ae.ColorSource.VERTEX,
+                                                                double_sided=True, ground_fog=False))
         self.palette = list(pal.PALETTE_565)  # graded by the current Look
         self.light = (0.0, -1.0, 0.0)
         self.set_sky(*world.blend_sky(world.TIME_OF_DAY[0], world.TIME_OF_DAY[0], 0.0))
@@ -152,7 +157,8 @@ class View:
                 a = j * n + i
                 b, c = a + 1, a + n
                 idx.extend((a, c, b, b, c, c + 1))
-        mesh = ae.Mesh(pos.tobytes(), idx.tobytes(), vertex_rgb=bytes(rgb))
+        mesh = ae.Mesh(pos.tobytes(), idx.tobytes(), vertex_rgb=bytes(rgb),
+                       submeshes=[(0, len(idx) // 3, self.ground_material)])
         if self.terrain:
             self.e.update_mesh(self.terrain, mesh)
         else:
@@ -194,7 +200,7 @@ class View:
         f.character.ambient, f.character.diffuse = CHAR_AMBIENT, CHAR_DIFFUSE
         f.overlay = rgba(pal.PALETTE_565[pal.HURT], HURT_ALPHA) if frame.flags & g3d.FLAG_HURT else 0
 
-        e.draw(self.terrain, (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0), light=ae.Light.UNLIT)
+        e.draw(self.terrain, (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0))
         hand = None
         for k, block in enumerate(frame.rigs):
             hand = self._rig(block, k == 0) or hand
@@ -214,7 +220,7 @@ class View:
                            for x, z, yaw, scale, mesh, tint in self.scene.rocks]
         return self._rocks
 
-    def _mesh(self, mesh_id, model, tint=0, light=ae.Light.SUN, fade=0.0):
+    def _mesh(self, mesh_id, model, tint=0, light=ae.Light.MATERIAL, fade=0.0):
         handle = self.meshes.get(mesh_id)
         if handle:
             self.e.draw(handle, model, tint=tint, light=light, fade=fade, ground_fog=tint != pal.FLASH)
@@ -226,7 +232,7 @@ class View:
         r = RIGS[block.rig_id]
         poses = rig.pose(r, block.anim, block.phase)
         base = rig.rig_to_world(block.x, block.y, block.z, block.yaw)
-        light = ae.Light.CHARACTER if block.char_light else ae.Light.SUN
+        light = ae.Light.CHARACTER if block.char_light else ae.Light.MATERIAL
         for bone, local in zip(r["bones"], poses):
             if bone["mesh_id"] is not None and bone["mesh_id"] != 0xFF:
                 self._mesh(bone["mesh_id"], _model(*rig.compose(base, local)), light=light, fade=block.fade)
@@ -261,12 +267,12 @@ class View:
                 quad.extend(c + s * k for c, s in zip(end, side))
         color = rgb888(self.palette[pal.ROPE]).to_bytes(3, "big") * 4
         mesh = ae.Mesh(array("f", quad).tobytes(), array("H", (0, 1, 2, 2, 1, 3)).tobytes(), vertex_rgb=color,
-                       double_sided=True)
+                       submeshes=[(0, 2, self.rope_material)])
         if self.rope:
             self.e.update_mesh(self.rope, mesh)
         else:
             self.rope = self.e.create_mesh(mesh)
-        self.e.draw(self.rope, (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0), light=ae.Light.UNLIT, ground_fog=False)
+        self.e.draw(self.rope, (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0))
 
     # ---- HUD (sketch/hud.cpp, at twice the pixel size) ------------------------------------------
     def _hud(self, hud):
