@@ -26,26 +26,26 @@ import alia_engine as ae  # noqa: E402
 import assets  # noqa: E402
 import audio  # noqa: E402
 import sfx  # noqa: E402
-import g3d  # noqa: E402
+import controls  # noqa: E402
 import world  # noqa: E402
 from alia_view import View  # noqa: E402
 from game import Game  # noqa: E402
 
 # The controls as alia-engine input actions (its docs/api.md §6). Alia Pad buttons are positional; the labels
-# are Nintendo-style (A = East, B = South, X = North). Each action is one of the g3d button bits the game reads.
+# are Nintendo-style (A = East, B = South, X = North). Each action is one of the button bits the game reads (controls.py).
 ACTIONS = {"confirm": ["EAST"], "shoot": ["SOUTH"], "hook": ["NORTH", "R1"], "stick": ["L3"], "pause": ["START"],
            "ride": {"stick": "left"}, "look": {"stick": "right"}}  # controls.py applies the dead zones
-ACTION_BITS = (("confirm", g3d.BTN_A), ("shoot", g3d.BTN_B), ("hook", g3d.BTN_C), ("stick", g3d.BTN_STICK),
-               ("pause", g3d.BTN_START))
+ACTION_BITS = (("confirm", controls.BTN_A), ("shoot", controls.BTN_B), ("hook", controls.BTN_C), ("stick", controls.BTN_STICK),
+               ("pause", controls.BTN_START))
 
 
 def raw_input(actions, seq):
-    """alia_engine.Actions -> the g3d.RawInput the game reads (sticks in raw -127..127 units, y up)."""
+    """alia_engine.Actions -> the controls.RawInput the game reads (sticks in raw -127..127 units, y up)."""
     axis = lambda v: max(-127, min(127, round(v * 127)))  # noqa: E731
     held = sum(bit for name, bit in ACTION_BITS if actions.held(name))
     pressed = sum(bit for name, bit in ACTION_BITS if actions.pressed(name))
     (jx, jy), (rx, ry) = actions.axis("ride"), actions.axis("look")
-    return g3d.RawInput(seq_ack=seq, connected=7, held=held, pressed=pressed, jx=axis(jx), jy=axis(-jy), ax=0, ay=0,
+    return controls.RawInput(seq_ack=seq, connected=7, held=held, pressed=pressed, jx=axis(jx), jy=axis(-jy), ax=0, ay=0,
                         az=1000, gx=0, gy=0, render_ms=0, push_ms=0, rx=axis(rx), ry=axis(-ry))
 
 
@@ -58,10 +58,10 @@ class DemoInput:
 
     def __call__(self, seq):
         self.step += 1
-        pressed = g3d.BTN_A if self.step in (5, 10) else 0
+        pressed = controls.BTN_A if self.step in (5, 10) else 0
         jy, rx = (60, 40) if self.step > 20 else (0, 0)
-        held = g3d.BTN_B if self.step > 20 and (self.step // 45) % 2 else 0
-        return g3d.RawInput(seq, 7, held, pressed, 0, jy, 0, 0, 1000, 0, 0, 0, 0, rx, 0)
+        held = controls.BTN_B if self.step > 20 and (self.step // 45) % 2 else 0
+        return controls.RawInput(seq, 7, held, pressed, 0, jy, 0, 0, 1000, 0, 0, 0, 0, rx, 0)
 
 
 class Megalith:

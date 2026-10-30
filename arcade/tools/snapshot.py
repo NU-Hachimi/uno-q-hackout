@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Drive the real Python game with scripted inputs and save the scene upload plus a few frames,
-so tests/cpp/render_preview.sh --snapshots can render them with the MCU renderer.
+"""Drive the real game with scripted inputs through 44 keyframes and save, for each, the game's state
+(NAME.state.json) and, with --alia, alia-engine's picture (NAME.alia.png, headless):
 
-    python3 tools/snapshot.py OUT_DIR
-    python3 tools/snapshot.py OUT_DIR --alia   also NAME.alia.png from alia-engine (python/alia_view.py)
+    python3 tools/snapshot.py OUT_DIR --alia
+    python3 tools/snapshot_compare.py OLD_DIR OUT_DIR     (the regression check, docs/alia-port.md §5)
 
 alia_engine must be importable (PYTHONPATH): the game plays in its world (headless) either way.
 """
 
-import struct
 import sys
 from pathlib import Path
 
@@ -21,7 +20,7 @@ import math  # noqa: E402
 import alia_engine  # noqa: E402
 
 import assets  # noqa: E402
-import g3d  # noqa: E402
+import controls  # noqa: E402
 import world  # noqa: E402
 from boss import CHARGING, STRIKING  # noqa: E402
 from game import Game  # noqa: E402
@@ -32,7 +31,7 @@ NEUTRAL_G = (0, 0, 1000)  # mg; unused since the right stick replaced tilt
 
 def raw(jx=0, jy=0, held=0, pressed=0, connected=7, accel=NEUTRAL_G, rx=0, ry=0):
     # Stick values in raw units with preview.py's INVERT_Y: pushing forward reads positive jy.
-    return g3d.RawInput(0, connected, held, pressed, jx, jy, *accel, 0, 0, 0, 0, rx, ry)
+    return controls.RawInput(0, connected, held, pressed, jx, jy, *accel, 0, 0, 0, 0, rx, ry)
 
 
 def _rounded(v):
@@ -47,8 +46,8 @@ def _rounded(v):
 
 def state_of(game, frame):
     """The game at a keyframe, as plain data (NAME.state.json): what the Frame carries (camera, HUD, objects,
-    rigs, hook) and what it doesn't (the PC, the boss, the particles, the sounds). It replaces the .frame packets
-    as the regression check once the MCU path goes (docs/alia-port.md, step 8); floats to 4 decimals."""
+    rigs, hook) and what it doesn't (the PC, the boss, the particles, the sounds). Floats to 4 decimals: two runs of
+    the same code are identical."""
     p, b = game.player, game.boss
     return _rounded({
         "game": {"state": game.state, "time": game.time, "sounds": [name for name, _ in game.sounds]},
@@ -62,14 +61,6 @@ def state_of(game, frame):
                  "hp": {str(k): v for k, v in sorted(b.hp.items())}, "alive": b.alive, "fade": b.fade,
                  "waves": [list(w[:4]) for w in b.waves]},
     })
-
-
-def write_scene(path, scene):
-    header, chunks, crc = g3d.pack_scene(scene)
-    out = struct.pack("<H", len(header)) + header + bytes([len(chunks)])
-    for kind, index, data in chunks:
-        out += struct.pack("<BBH", kind, index, len(data)) + data
-    path.write_bytes(out + struct.pack("<H", crc))
 
 
 def main():
@@ -98,11 +89,9 @@ def main():
         return frame
 
     game = new_game()  # picks this round's parts into scene.slot_variants
-    write_scene(out / "scene.bin", scene)
     seq = 0
 
     def save(name, frame):
-        (out / f"{name}.frame").write_bytes(frame.pack(seq))
         (out / f"{name}.state.json").write_text(json.dumps(state_of(game, frame), indent=1, sort_keys=True) + "\n")
         if view:
             view.update(frame, game.player.hand())
@@ -111,7 +100,6 @@ def main():
             view.e.screenshot(str(out / f"{name}.alia.png"))
 
     def sky(name, t):
-        (out / f"{name}.sky").write_bytes(g3d.pack_sky(*world.sky_at(t)))
         if view:
             view.set_sky(*world.sky_at(t))
 
@@ -125,7 +113,7 @@ def main():
 
     run("1_ready", [raw()])
     # The intro: A, then the PC gallops in on its own; the boss looms out of the fog
-    run("2a_intro_fog", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A)] + [raw()] * 50)
+    run("2a_intro_fog", [raw(pressed=controls.BTN_A, held=controls.BTN_A)] + [raw()] * 50)
     run("2b_intro_near", [raw()] * 60)
     intro = 0
     while game.state == "intro" and intro < 400:
@@ -134,11 +122,11 @@ def main():
     run("2_fight_hint", [raw()])
     # Walk forward and right for 1.5 s, then hold B while turning a little with the right stick.
     walk = [raw(jx=40, jy=110)] * 30
-    shoot = [raw(held=g3d.BTN_B, rx=70)] * 6
+    shoot = [raw(held=controls.BTN_B, rx=70)] * 6
     run("3_walk_shoot", walk + shoot)
-    run("4_menu", [raw(pressed=g3d.BTN_START, held=g3d.BTN_START), raw(jy=-110)])
+    run("4_menu", [raw(pressed=controls.BTN_START, held=controls.BTN_START), raw(jy=-110)])
     run("5_missing", [raw(connected=5)])
-    run("6_menu_continue", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A)])  # Continue (A) back to the fight
+    run("6_menu_continue", [raw(pressed=controls.BTN_A, held=controls.BTN_A)])  # Continue (A) back to the fight
 
     def look_at(point, distance):
         """Stand `distance` from a point on the ground, facing it, with the camera on it."""
@@ -155,11 +143,11 @@ def main():
     look_at(centre, 14)
     run("7_aim_part", [raw()])
     part = game.aim.target.slot if game.aim.target else part  # the part the reticle snapped to
-    run("8_shoot_part", [raw(pressed=g3d.BTN_B), raw()])  # one shot: the tracer on its way
+    run("8_shoot_part", [raw(pressed=controls.BTN_B), raw()])  # one shot: the tracer on its way
     while boss.hp[part] > 1:
         boss.damage(part, 1)
     boss.hit_timer = 0
-    run("9_break_part", [raw(pressed=g3d.BTN_B)] + [raw()] * 5)
+    run("9_break_part", [raw(pressed=controls.BTN_B)] + [raw()] * 5)
     for slot in boss.parts:
         boss.damage(slot, 99)
     game.boss.broken.clear()
@@ -168,15 +156,14 @@ def main():
     hump = next(c for c in boss.colliders() if c.hookable).centre()
     look_at(hump, 12)
     run("11_hook_aim", [raw()])
-    run("12_hook_flying", [raw(pressed=g3d.BTN_C), raw(), raw()])
+    run("12_hook_flying", [raw(pressed=controls.BTN_C), raw(), raw()])
     run("13_hooked", [raw()] * 30)
     boss.damage(boss.weak, 99, hooked=True)
     run("14_victory", [raw()])
-    # The day cycle at 8 points (holds and blends) on a fresh round; NAME.sky next to NAME.frame is a
-    # g3d_scene_sky payload that render_preview.sh applies after the scene.
+    # The day cycle at 8 points (holds and blends) on a fresh round.
     game = new_game()
-    skip_intro = [raw(pressed=g3d.BTN_A, held=g3d.BTN_A), raw(), raw(pressed=g3d.BTN_A, held=g3d.BTN_A)]
-    run("15_ride", skip_intro + [raw(jx=-30, jy=100)] * 20 + [raw(held=g3d.BTN_B)] * 3)
+    skip_intro = [raw(pressed=controls.BTN_A, held=controls.BTN_A), raw(), raw(pressed=controls.BTN_A, held=controls.BTN_A)]
+    run("15_ride", skip_intro + [raw(jx=-30, jy=100)] * 20 + [raw(held=controls.BTN_B)] * 3)
     period = world.DAY_HOLD + world.DAY_BLEND
     for k in range(8):
         t = (k // 2) * period + (world.DAY_HOLD / 2 if k % 2 == 0 else world.DAY_HOLD + world.DAY_BLEND / 2)
@@ -218,7 +205,7 @@ def main():
         save(name, frame)
         seq += 1
 
-    # Boss attacks on a fresh round (same seed, so the same parts as scene.bin).
+    # Boss attacks on a fresh round (same seed, so the same parts).
     game = new_game()
     run("19_0_start", skip_intro)
     boss, p = game.boss, game.player
@@ -235,7 +222,7 @@ def main():
         game.camera.yaw = math.atan2(dx, dz)
         game.camera.pitch = math.atan2(dy, math.hypot(dx, dz))
     p.yaw = game.camera.yaw
-    run("20_0_hook", [raw(pressed=g3d.BTN_C)])
+    run("20_0_hook", [raw(pressed=controls.BTN_C)])
     run_until("20_1_shake_warning", lambda: boss.jump_off_warning(p) and boss.phase() > 20)
     run_until("20_2_thrown", lambda: p.airborne and p.vy < 2.0)
     for slot in boss.legs:
@@ -253,14 +240,14 @@ def main():
     p.hook, p.hook_anchor = "hooked", hump.node
     p.x, p.y, p.z = hump.centre()
     run("22_1_finish_prompt", [raw()])
-    run("23_execute_leap", [raw(pressed=g3d.BTN_B)] + [raw()] * 8)
+    run("23_execute_leap", [raw(pressed=controls.BTN_B)] + [raw()] * 8)
     run_until("24_execute_windup", lambda: game.finisher.phase > 110)
     run_until("24_execute_hit", lambda: game.finisher.frozen > 0)
     run_until("25_execute_twist", lambda: game.finisher.phase > 180)
     run_until("25_execute_shatter", lambda: game.finisher.after is not None and game.finisher.after > 0.15)
     run_until("25_execute_drop", lambda: game.finisher.dropped and game.player.vy < -3)
     run_until("26_victory", lambda: game.state == "win")
-    print(f"wrote {out}/scene.bin and {seq} frames")
+    print(f"wrote {seq} keyframes to {out}")
 
 
 if __name__ == "__main__":

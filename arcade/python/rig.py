@@ -118,7 +118,7 @@ def attach_matrix(rig, poses, name):
 
 
 def rig_to_world(x, y, z, yaw):
-    """T(pos) · Ry(yaw), with yaw in radians like every other g3d angle."""
+    """T(pos) · Ry(yaw), with yaw in radians like every other angle in the game."""
     return _ry(math.degrees(yaw)), (x, y, z)
 
 

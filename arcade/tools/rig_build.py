@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Turn assets/rigs/*.json into sketch/gen/, python/gen/ and the golden poses (api.md §5.1).
+"""Turn assets/rigs/*.json into python/gen/ (rig data, rigs.apak) and the golden poses (api.md §5.1).
 
     python3 tools/rig_build.py          (run from arcade/; rewrites the generated files)
     python3 tools/rig_build.py --check  (exit 1 if the generated files are stale)
 
-The golden file holds bone and slot transforms from python/rig.py; the C++ rig code must match
-them within 1 cm (tests/cpp/rig_golden.sh).
+The golden files hold bone and slot transforms from python/rig.py (the reference implementation);
+alia-engine's poses must match them (tests/test_alia.py).
 
 python/gen/rigs.apak holds every rig in alia-engine's resource pack format (its docs/formats.md
 type 3), written with its tools/alia_pack.py (ALIA_ENGINE points at the checkout, default
@@ -82,103 +82,6 @@ def load_rig(path, mesh_ids):
     return rig
 
 
-def f(v):
-    return f"{float(v):.4f}f"
-
-
-def c_header(rig):
-    name = rig["name"]
-    out = [f"// {HEADER}", "#pragma once", "", '#include "rig_types.h"', "", "namespace gen {", ""]
-    for anim in rig["anims"]:
-        prefix = f"{name}_a{anim['id']}"
-        for bone in rig["bones"]:
-            track = anim["tracks"].get(bone["name"])
-            if track:
-                values = ", ".join(f(v) for key in track for v in key)
-                out.append(f"static const float {prefix}_{bone['name']}[] = {{{values}}};")
-        if anim.get("root_y"):
-            out.append(f"static const float {prefix}_root_y[] = {{{', '.join(f(v) for v in anim['root_y'])}}};")
-        tracks = ", ".join(f"{prefix}_{b['name']}" if b["name"] in anim["tracks"] else "nullptr" for b in rig["bones"])
-        out.append(f"static const float* const {prefix}_tracks[] = {{{tracks}}};")
-        out.append("")
-    out.append(f"static const RigBone {name}_bones[] = {{")
-    for bone in rig["bones"]:
-        offset = ", ".join(f(v) for v in bone["offset"])
-        out.append(f"    {{{bone['parent_index']}, {{{offset}}}, {bone['mesh_id']}}},  // {bone['name']}")
-    out.append("};")
-    out.append(f"static const RigAnim {name}_anims[] = {{")
-    for anim in rig["anims"]:
-        prefix = f"{name}_a{anim['id']}"
-        root_y = f"{prefix}_root_y" if anim.get("root_y") else "nullptr"
-        out.append(f"    {{{1 if anim['loop'] else 0}, {anim['keys']}, {root_y}, {prefix}_tracks}},  // {anim['name']}")
-    out.append("};")
-    out.append(f"static const RigSlot {name}_slots[] = {{")
-    for slot in rig["slots"]:
-        variants = slot["variant_mesh_ids"] + [0xFF] * (MAX_VARIANTS - len(slot["variant_mesh_ids"]))
-        out.append(f"    {{{slot['bone_index']}, {{{', '.join(f(v) for v in slot['offset'])}}}, "
-                   f"{{{', '.join(f(v) for v in slot['rot'])}}}, {len(slot['variant_mesh_ids'])}, "
-                   f"{{{', '.join(str(v) for v in variants)}}}}},  // {slot['bone']} {'/'.join(slot.get('tags', []))}")
-    out.append("};")
-    attach = rig.get("attach", {})
-    out.append(f"static const RigAttach {name}_attach[] = {{")
-    for point, a in attach.items():
-        out.append(f"    {{{a['bone_index']}, {{{', '.join(f(v) for v in a['offset'])}}}}},  // {point}")
-    out.append("};")
-    for i, point in enumerate(attach):
-        out.append(f"constexpr uint8_t RIG_{name.upper()}_{point.upper()} = {i};  // attach index")
-    out.append(f"static const Rig RIG_{name.upper()} = {{{len(rig['bones'])}, {name}_bones, {len(rig['anims'])}, "
-               f"{name}_anims, {len(rig['slots'])}, {name}_slots, {len(attach)}, {name}_attach}};")
-    out += ["", "}  // namespace gen", ""]
-    return "\n".join(out)
-
-
-TYPES_H = f"""// {HEADER}
-#pragma once
-
-#include <stdint.h>
-
-namespace gen {{
-
-struct RigBone {{
-  int8_t parent;     // index of the parent bone, -1 for the root
-  float offset[3];   // joint position in the parent's frame, m
-  uint8_t mesh;      // mesh id (gen/meshes.h), 0xFF for none
-}};
-
-struct RigAnim {{
-  uint8_t loop, keys;
-  const float* rootY;           // keys values added to the root offset's y, or nullptr
-  const float* const* tracks;   // per bone: keys x (rx, ry, rz) degrees, or nullptr (rest pose)
-}};
-
-struct RigSlot {{
-  uint8_t bone;
-  float offset[3];        // in the bone's frame, m
-  float rot[3];           // rx, ry, rz degrees, R = Ry * Rx * Rz
-  uint8_t nVariants;      // including variant 0 (empty)
-  uint8_t variantMesh[{MAX_VARIANTS}];  // mesh id per variant; [0] is 0xFF
-}};
-
-struct RigAttach {{
-  uint8_t bone;
-  float offset[3];  // in the bone's frame, m
-}};
-
-struct Rig {{
-  uint8_t nBones;
-  const RigBone* bones;
-  uint8_t nAnims;
-  const RigAnim* anims;
-  uint8_t nSlots;
-  const RigSlot* slots;
-  uint8_t nAttach;
-  const RigAttach* attach;  // named points (rig JSON attach), indexed by RIG_<RIG>_<POINT>
-}};
-
-}}  // namespace gen
-"""
-
-
 def golden(rig):
     data = {"rig": rig["name"], "id": rig["id"], "phases": list(GOLDEN_PHASES),
             "note": "Rig-space bone and slot transforms from python/rig.py: origin, then +X/+Y/+Z unit points.",
@@ -215,22 +118,13 @@ def build():
     rigs = sorted((load_rig(p, mesh_ids) for p in (ASSETS / "rigs").glob("*.json")), key=lambda r: r["id"])
     if not rigs or rigs[0]["id"] < 1 or len({r["id"] for r in rigs}) != len(rigs):
         fail("rig ids must be unique and start at 1 (0 means no rig)")
-    outputs = {ROOT / "sketch" / "gen" / "rig_types.h": TYPES_H}
-    table = ["nullptr"] * (rigs[-1]["id"] + 1)
-    includes = []
+    outputs = {}
     for rig in rigs:
         name = rig["name"]
-        outputs[ROOT / "sketch" / "gen" / f"rig_{name}.h"] = c_header(rig)
-        includes.append(f'#include "rig_{name}.h"')
-        table[rig["id"]] = f"&RIG_{name.upper()}"
         keep = {k: v for k, v in rig.items()}
         outputs[ROOT / "python" / "gen" / f"rig_{name}.py"] = (
             f'"""{HEADER}"""\n\nRIG = ' + pprint.pformat(keep, width=110, sort_dicts=False) + "\n")
         outputs[ROOT / "tests" / "golden" / f"rig_{name}.json"] = golden(rig)
-    outputs[ROOT / "sketch" / "gen" / "rigs.h"] = "\n".join(
-        [f"// {HEADER}", "#pragma once", ""] + includes +
-        ["", "namespace gen {", f"constexpr int RIG_COUNT = {len(table)};",
-         f"static const Rig* const RIGS[RIG_COUNT] = {{{', '.join(table)}}};  // index = rig_id", "}  // namespace gen", ""])
     pack = PackWriter()
     for rig in rigs:
         pack.add_rig(rig["name"], engine_rig(rig))  # the engine keeps what it uses (no hp, tags)

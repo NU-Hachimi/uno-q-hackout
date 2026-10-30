@@ -17,7 +17,7 @@ from pathlib import Path
 import alia_engine as ae
 
 import assets
-import g3d
+import screen
 import world
 from gen import mesh_ids
 from gen import palette as pal
@@ -192,21 +192,21 @@ class View:
         e, f, cam = self.e, self.e.frame, frame.camera
         c = e.world.camera
         c.position, c.yaw, c.pitch, c.fov_x = (cam.x, cam.y, cam.z), cam.yaw, cam.pitch, math.radians(cam.fov)
-        f.fog_steps = 0 if frame.flags & g3d.FLAG_NO_FOG else FOG_STEPS
+        f.fog_steps = 0 if frame.flags & screen.FLAG_NO_FOG else FOG_STEPS
         # Character light: from just above and right of the camera (api.md §3.3).
         fwd = (math.sin(cam.yaw) * math.cos(cam.pitch), math.sin(cam.pitch), math.cos(cam.yaw) * math.cos(cam.pitch))
         key = (-fwd[0] - 0.45 * math.cos(cam.yaw), -fwd[1] + 0.7, -fwd[2] + 0.45 * math.sin(cam.yaw))
         length = math.sqrt(sum(c * c for c in key))
         f.character.travel = tuple(-c / length for c in key)
         f.character.ambient, f.character.diffuse = CHAR_AMBIENT, CHAR_DIFFUSE
-        f.overlay = rgba(pal.PALETTE_565[pal.HURT], HURT_ALPHA) if frame.flags & g3d.FLAG_HURT else 0
+        f.overlay = rgba(pal.PALETTE_565[pal.HURT], HURT_ALPHA) if frame.flags & screen.FLAG_HURT else 0
 
         self._objects(frame.objects)  # the rigs are the boss's and the player's own nodes
         self._rope(frame.hook, hand, cam)
 
     def draw(self, frame):
         """Every displayed frame: the HUD (the world draws itself)."""
-        if not frame.flags & g3d.FLAG_NO_HUD:
+        if not frame.flags & screen.FLAG_NO_HUD:
             self._hud(frame.hud)
 
     def _objects(self, objects):
@@ -277,7 +277,7 @@ class View:
             say((w - (len(s) * 6 - 1) * PX) // 2, y, s, color)
 
         message = MESSAGES[hud.msg] if hud.msg < len(MESSAGES) else ""
-        if hud.state == g3d.STATE_FIGHT:
+        if hud.state == screen.STATE_FIGHT:
             for i in range(hud.hp_max):
                 x, y = 8 + i * 16, 8
                 if i < hud.hp:
@@ -294,7 +294,7 @@ class View:
             self._reticle(hud, w // 2 + hud.reticle_dx * w / MCU_W, h // 2 + hud.reticle_dy * w / MCU_W)
             if message:
                 centred(h - 45, message)
-        elif hud.state == g3d.STATE_PAUSED:
+        elif hud.state == screen.STATE_PAUSED:
             if hud.msg in MENU_ITEMS:
                 bw, bh = 268, 110
                 x0, y0 = (w - bw) // 2, (h - bh) // 2

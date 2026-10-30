@@ -1,6 +1,5 @@
 import math
 
-import g3d
 import world
 from arena import W
 from gen import mesh_ids
@@ -16,12 +15,10 @@ def test_rocks_stay_out_of_the_arena():
     assert world.make_scene(seed=3).rocks == scene.rocks
 
 
-def test_every_time_of_day_uploads():
+def test_every_time_of_day_makes_a_scene():
     for look in world.TIME_OF_DAY:
         scene = world.make_scene(seed=1, look=look)
-        header, chunks, crc = g3d.pack_scene(scene)
-        assert [len(d) for k, _, d in chunks if k == g3d.KIND_LOOK] == [76]
-        assert header[1] == 1  # the moose
+        assert len(scene.look) == 76 and scene.rig_id == 1  # the Look block alia_view.py grades with; the moose
         assert scene.fog_far == 2 * LOOKS[look]["scene"].get("fog_far", scene.fog_far / 2)
 
 
@@ -36,7 +33,6 @@ def test_day_cycle_holds_each_look_then_blends():
     mid_fields, _ = world.sky_at(world.DAY_HOLD + world.DAY_BLEND / 2)
     a, b = world.sky_fields("forbidden_plain"), world.sky_fields("dusk")
     assert min(a["fog_far"], b["fog_far"]) <= mid_fields["fog_far"] <= max(a["fog_far"], b["fog_far"])
-    assert len(g3d.pack_sky(*world.sky_at(3.0))) == 90
 
 
 def test_sky_update_only_while_changing():

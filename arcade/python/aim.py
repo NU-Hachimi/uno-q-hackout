@@ -10,7 +10,7 @@ ASSIST_DEG = 4.0                     # snap to a target within this angle of the
 HOOK_ASSIST_DEG = 6.0                # hook points are small: the hook snaps to them from a little further out
 HOOK_SURFACE = 1.5                   # m; the boss's own surface this close before a hook point does not block it
 FOCAL = 120 / math.tan(math.radians(camera.FOV / 2))  # px; the MCU's projection (fovX, 240 wide)
-MAX_OFFSET = 254                     # px; the frame packet sends the offset in 2 px units (i8)
+MAX_OFFSET = 254                     # px at 240x160: how far the reticle may move off the centre
 FLAG_PART, FLAG_HOOK = 1, 2          # reticle_flags (api.md §3.3)
 HOOK_RANGE = 25.0                    # m from the PC's hand (player.HOOK_RANGE)
 

@@ -26,13 +26,13 @@
 | `rig.py` | rig 姿态（Python 参考实现） | 只剩测试和 `rig_build.py` 的黄金数据在用；玩法不再用（第 5b 步） |
 | `collide.py` | 碰撞的**分类**：BODY / PART / HOOK 层、`Collider`（骨骼号、槽号）、`push_out`。形状和射线在引擎里 | 保留（玩法逻辑） |
 | `assets.py` | 把 `gen/rigs.apak` 加载进引擎一次 | 保留 |
-| `g3d.py` | 原来的通信协议：数据结构 + 打包函数（打包函数现在只有测试在用） | 第 8 步删掉 |
+| `screen.py` | 每一步给画面的数据：Camera、Obj、Hud、Hook、Rig、Frame（原来 `g3d.py` 里的记录，打包格式随 MCU 去掉了） | 保留，第 8 步余下的部分再看要不要并进 `hud.py` |
 | `alia_view.py` | 翻译层：Frame → 引擎；Look 调色、地形烘焙、绳子、HUD 排版 | 拆成 `look.py`（调色、天色）和 `hud.py`（HUD），其余删掉 |
 | `tilt_config.py`、`preview.py` | 手感参数（名字还是"倾斜"）、摇杆死区 | 合并成 `tuning.py` |
 | `audio.py` | 放哪首音乐、多大声（引擎的混音器在放，第 7 步） | 保留 |
 | `tools/mesh_build.py`、`rig_build.py`、`audio_build.py` | PC 上把 `assets/` 烘焙成 `python/gen/` | 保留；输出改成引擎的资源包（`meshes.apak` 已经是） |
-| `tools/snapshot.py`（`--alia`）、`cart_art.py`、`cart_build.sh` | 44 张关键帧快照（回归）、卡带美术、卡带打包 | 保留 |
-| `sketch/` | 原来的 MCU 渲染器 | 保留作画面参照（`tests/cpp/render_preview.sh`） |
+| `tools/snapshot.py`（`--alia`）、`snapshot_compare.py`、`cart_art.py`、`cart_build.sh` | 44 张关键帧快照（游戏状态 + 截图，回归）、比较两次快照、卡带美术、卡带打包 | 保留 |
+| ~~`sketch/`~~、~~`g3d.py`~~、~~`tests/cpp/`~~、~~`app.yaml`~~ | MCU 渲染器、通信协议、它们的测试、App Lab 的清单 | 第 8 步去掉了（原版在 `main` 分支） |
 
 ## 3. 目标结构（E4 第 8 步）
 
@@ -68,10 +68,10 @@ tuning.py     手感参数（原 tilt_config.py + preview.py）
 | 6 粒子 | 纯视觉的效果换成引擎的粒子（`effects.py` 的三个模板，数字和原来 Python 里的一样）：子弹落点的火花（`hit`，按子弹的颜色）、打碎部件的碎片（`debris`，按部件的颜色）、处决时手上的火花（`orbs`，`time_scale` 跟着慢动作和打击停顿）。发射器归 Player。去掉了 `Spark`、`MAX_SPARKS = 4` 和处决的 `orbs` 列表；尘环和曳光弹有玩法意义，仍然是 Frame 里的物体。`assets.py` 现在也加载网格和粒子模板（`alia_view.py` 从那里拿网格）。快照工具用 `World.begin_step / end_step` 包住每一步，粒子在截图里也会动、会消失。效果：以前 MCU 的物体上限把处决时的碎片挤掉了，现在弱点碎掉时能看到碎片（快照 `25_execute_shatter`） | ✅ |
 | 7 系统 | 按键映射用引擎的动作映射：`main.py` 的 `ACTIONS` 表（confirm / shoot / hook / stick / pause 五个按钮动作，ride / look 两个摇杆）`load` 进 `engine.actions`，`raw_input()` 从动作拼出游戏读的 `RawInput`（`tests/test_main.py`）✅。`audio.py` 换成引擎的混音器：不再起 `aplay` 子进程、不再在 Python 线程里混音和淡入淡出，只告诉引擎放哪首、多大声、从哪儿循环（`music.json`）；"每步调用、同一首只改音量、放完的短曲不重放"的行为不变，换曲从"先淡出再开始"变成交叉淡化 | ✅ |
 | 6b 清理 | `rig.py` 回到简单好读的参考实现：去掉了为板上性能加的姿态缓存、部件槽缓存和手工展开的 3×3 运算（生成的黄金文件逐字节不变）。引擎对照固定的黄金文件 `tests/golden/rig_*.json`（每块骨骼的变换、每个部件槽在生成的 rig 上的位置，差在 2×10⁻⁵ 以内），不再现算 `rig.py`。顺手修了一个偶发失败的测试：`test_boss.py` 的 BOSS 没给随机种子，攻击节奏每次不同 | ✅ |
-| 8 收尾 | **MCU 那条路整个去掉**（原版留在 `main` 分支）：`sketch/`、`tests/cpp/`、`scripts/flash.sh`、`mesh_build.py` / `rig_build.py` 生成的 C 头文件、`g3d.py`（不只是协议：`RawInput`、`Camera`、`Obj`、`Hud`、按键常量是玩法和画面之间传的数据类型，要换成游戏自己的类型或者直接读引擎的输入）、`Frame`、快照里的 `.frame` 包。**先换回归手段**：`.frame` 包逐字节一致是现在最严的检查，删掉之前 `snapshot.py` 改成每个关键帧转储一份游戏状态（PC、BOSS、相机、物体，JSON），比对它和截图。然后拆分 `alia_view.py`，改名（`world.py` → `terrain.py` 等）。`retroarch/` 和 Megalith 无关（比赛的另一个演示），留着 | |
+| 8 收尾（进行中） | **MCU 那条路整个去掉（✅ 2026-10-30）**：`sketch/`、`tests/cpp/`、`scripts/flash.sh`、`app.yaml`、`g3d.py`、两个生成工具里的 C 头文件、快照里的 `.frame` / `.sky` / `scene.bin`；回归先换成了游戏状态的转储（`snapshot_compare.py`），去掉以后 44 张关键帧状态和截图全部一致；`g3d.py` 的数据记录搬进 `screen.py`、`controls.py`、`world.py`。原来的计划：（原版留在 `main` 分支）：`sketch/`、`tests/cpp/`、`scripts/flash.sh`、`mesh_build.py` / `rig_build.py` 生成的 C 头文件、`g3d.py`（不只是协议：`RawInput`、`Camera`、`Obj`、`Hud`、按键常量是玩法和画面之间传的数据类型，要换成游戏自己的类型或者直接读引擎的输入）、`Frame`、快照里的 `.frame` 包。**先换回归手段**：`.frame` 包逐字节一致是现在最严的检查，删掉之前 `snapshot.py` 改成每个关键帧转储一份游戏状态（PC、BOSS、相机、物体，JSON），比对它和截图。然后拆分 `alia_view.py`，改名（`world.py` → `terrain.py` 等）。`retroarch/` 和 Megalith 无关（比赛的另一个演示），留着 | |
 
 ## 5. 怎么验收
 
-- `make test`：82 个玩法测试，在无头的 alia-engine 里跑（先编译 `build/engine-pc`；BOSS 的 rig 和碰撞体在引擎的世界里）。
-- `tools/snapshot.py OUT --alia`：44 张关键帧，每张都有截图（`.alia.png`）、游戏状态（`.state.json`：Frame 里的相机、HUD、物体、rig、钩子，加上 PC、BOSS、粒子数、这一步的声音事件，浮点保留 4 位）和 MCU 的帧包（`.frame`，第 8 步删掉）。`python3 tools/snapshot_compare.py 旧 新` 逐张比较：状态要相等，截图超过 8 级的像素要为 0（同一份代码跑两次逐字节一致）。画面确实会变的步骤（插值让运动更平滑、C++ 和 Python 的浮点差异）改成"关掉插值时一致，或者只差在边缘像素"，并在提交说明里写明差了多少。
+- `make test`：79 个玩法测试，在无头的 alia-engine 里跑（先编译 `build/engine-pc`；BOSS 的 rig 和碰撞体在引擎的世界里）。
+- `tools/snapshot.py OUT --alia`：44 张关键帧，每张都有截图（`.alia.png`）和游戏状态（`.state.json`：Frame 里的相机、HUD、物体、rig、钩子，加上 PC、BOSS、粒子数、这一步的声音事件，浮点保留 4 位）。`python3 tools/snapshot_compare.py 旧 新` 逐张比较：状态要相等，截图超过 8 级的像素要为 0（同一份代码跑两次逐字节一致）。画面确实会变的步骤（插值让运动更平滑、C++ 和 Python 的浮点差异）改成"关掉插值时一致，或者只差在边缘像素"，并在提交说明里写明差了多少。
 - 板上：`make cart install launch`，`--stats` 看 `update_ms`、`render_ms`。

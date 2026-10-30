@@ -3,7 +3,8 @@ import random
 
 import aim
 import camera
-import g3d
+import controls
+import screen
 import world
 from arena import W
 from boss import Boss, pick_parts
@@ -24,7 +25,7 @@ def setup(seed=3):
 
 def look_at(pc, centre):
     """A camera behind the PC looking straight at `centre`."""
-    view = g3d.Camera(pc.x, pc.y + 2.5, pc.z, fov=camera.FOV)
+    view = screen.Camera(pc.x, pc.y + 2.5, pc.z, fov=camera.FOV)
     d = tuple(b - a for a, b in zip((view.x, view.y, view.z), centre))
     view.yaw = math.atan2(d[0], d[2])
     view.pitch = math.atan2(d[1], math.hypot(d[0], d[2]))
@@ -49,7 +50,7 @@ def test_hook_flies_pulls_and_rides_the_bone():
     view, brow = hook_view(boss, pc)
     a = step(pc, boss, view=view)
     assert a.flags & aim.FLAG_HOOK and a.hook.collider.kind == "hook"
-    step(pc, boss, Input(pressed=g3d.BTN_C), view)
+    step(pc, boss, Input(pressed=controls.BTN_C), view)
     assert pc.hook == "flying" and pc.hook_block().flags == 1
     for _ in range(80):
         step(pc, boss)
@@ -99,11 +100,11 @@ def test_letting_go_falls_to_the_ground():
     scene, boss = setup()
     pc = Player(scene, W, x=0.0, z=-14.0)
     view, _ = hook_view(boss, pc)
-    step(pc, boss, Input(pressed=g3d.BTN_C), view)
+    step(pc, boss, Input(pressed=controls.BTN_C), view)
     for _ in range(80):
         step(pc, boss)
     assert pc.hooked
-    step(pc, boss, Input(pressed=g3d.BTN_C))
+    step(pc, boss, Input(pressed=controls.BTN_C))
     assert pc.hook is None and pc.airborne
     for _ in range(60):
         step(pc, boss)
@@ -113,8 +114,8 @@ def test_letting_go_falls_to_the_ground():
 def test_a_miss_comes_back():
     scene, boss = setup()
     pc = Player(scene, W, x=0.0, z=-14.0)
-    view = g3d.Camera(pc.x, pc.y + 2.5, pc.z, yaw=math.pi, fov=camera.FOV)  # facing away from the boss
-    a = step(pc, boss, Input(pressed=g3d.BTN_C), view)
+    view = screen.Camera(pc.x, pc.y + 2.5, pc.z, yaw=math.pi, fov=camera.FOV)  # facing away from the boss
+    a = step(pc, boss, Input(pressed=controls.BTN_C), view)
     assert not a.flags & aim.FLAG_HOOK and pc.hook == "flying"
     for _ in range(20):
         step(pc, boss)
@@ -145,7 +146,7 @@ def test_cannot_be_hurt_while_riding_the_hook():
 
 
 def raw(pressed=0):
-    return g3d.RawInput(0, 7, 0, pressed, 0, 0, 0, 0, 1000, 0, 0, 0, 0)
+    return controls.RawInput(0, 7, 0, pressed, 0, 0, 0, 0, 1000, 0, 0, 0, 0)
 
 
 def hook_on_brow(pc, boss):
@@ -158,8 +159,8 @@ def test_finisher_prompts_then_b_plays_it_and_wins():
     from finisher import EXECUTE_SECONDS, HIT_STOP, SLOW
     from game import EXECUTE, MSG_FINISH
     game = Game(world.make_scene(1), W, seed=1)
-    game.step(raw(g3d.BTN_A), DT)
-    game.step(raw(g3d.BTN_A), DT)  # skip the intro
+    game.step(raw(controls.BTN_A), DT)
+    game.step(raw(controls.BTN_A), DT)  # skip the intro
     boss, pc = game.boss, game.player
     for slot in boss.parts:
         boss.damage(slot, 99)
@@ -168,7 +169,7 @@ def test_finisher_prompts_then_b_plays_it_and_wins():
     frame = game.step(raw(), DT)
     assert frame.hud.msg == MSG_FINISH
     shots = pc.shots
-    frame = game.step(raw(g3d.BTN_B), DT)
+    frame = game.step(raw(controls.BTN_B), DT)
     assert game.state == EXECUTE and pc.shots == shots  # B finished instead of shooting
     fin = game.finisher
     time, hit, shattered = 0.0, None, None
@@ -176,7 +177,7 @@ def test_finisher_prompts_then_b_plays_it_and_wins():
         frame = game.step(raw(), DT)
         time += DT
         if game.state == EXECUTE:
-            assert frame.flags & g3d.FLAG_NO_HUD and frame.hook.flags == 0 and len(frame.objects) <= g3d.MAX_OBJ
+            assert frame.flags & screen.FLAG_NO_HUD and frame.hook.flags == 0
         if hit is None and fin.frozen > 0:
             hit = time
             assert math.dist(fin._hand(), fin.weak_point()) < 0.3  # the hook goes into the weak point
@@ -189,13 +190,13 @@ def test_finisher_prompts_then_b_plays_it_and_wins():
     assert game.state == WIN and frame.hud.msg == 13
     assert boss.fade == 1.0  # sank into the fog
     assert pc.hook is None and not pc.airborne and pc.y == world.terrain_height(game.scene, pc.x, pc.z)  # back in the saddle
-    game.step(raw(g3d.BTN_A), DT)
+    game.step(raw(controls.BTN_A), DT)
     assert game.state == READY
 
 def test_losing_all_health_loses():
     game = Game(world.make_scene(1), W, seed=1)
-    game.step(raw(g3d.BTN_A), DT)
-    game.step(raw(g3d.BTN_A), DT)  # skip the intro
+    game.step(raw(controls.BTN_A), DT)
+    game.step(raw(controls.BTN_A), DT)  # skip the intro
     game.player.hp = 0
     frame = game.step(raw(), DT)
     assert game.state == LOSE and frame.hud.msg == 14

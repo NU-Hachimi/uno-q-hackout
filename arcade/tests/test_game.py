@@ -1,6 +1,7 @@
 import math
 
-import g3d
+import controls
+import screen
 import world
 from arena import W
 from controls import Controls
@@ -10,14 +11,14 @@ DT = 0.05
 
 
 def raw(jx=0, jy=0, held=0, pressed=0, connected=7, accel=(0, 0, 1000), rx=0, ry=0):
-    return g3d.RawInput(0, connected, held, pressed, jx, jy, *accel, 0, 0, 0, 0, rx, ry)
+    return controls.RawInput(0, connected, held, pressed, jx, jy, *accel, 0, 0, 0, 0, rx, ry)
 
 
 def started():
     """A fight with the intro skipped (A starts it, A again skips it)."""
     game = Game(world.make_scene(1), W)
-    game.step(raw(pressed=g3d.BTN_A), DT)
-    game.step(raw(pressed=g3d.BTN_A), DT)
+    game.step(raw(pressed=controls.BTN_A), DT)
+    game.step(raw(pressed=controls.BTN_A), DT)
     assert game.state == FIGHT
     return game
 
@@ -25,11 +26,11 @@ def started():
 def test_ready_shows_prompt_and_a_starts():
     game = Game(world.make_scene(1), W)
     frame = game.step(raw(), DT)
-    assert game.state == READY and frame.hud.state == g3d.STATE_READY and frame.hud.msg == 1
+    assert game.state == READY and frame.hud.state == screen.STATE_READY and frame.hud.msg == 1
     assert frame.objects == []  # the PC is drawn as rigs: horse and rider
     boss, horse, rider = frame.rigs
     assert (boss.rig_id, horse.rig_id, rider.rig_id) == (1, 3, 4) and horse.char_light and rider.char_light
-    game.step(raw(pressed=g3d.BTN_A), DT)
+    game.step(raw(pressed=controls.BTN_A), DT)
     assert game.state == INTRO
 
 
@@ -53,13 +54,13 @@ def test_intro_rides_up_to_the_boss_then_hands_over():
     game = Game(world.make_scene(1), W)
     for _ in range(40):
         game.step(raw(), DT)
-    game.step(raw(pressed=g3d.BTN_A), DT)
+    game.step(raw(pressed=controls.BTN_A), DT)
     fades, dist = [], []
     for _ in range(400):
         frame = game.step(raw(jx=127, jy=-127), DT)  # the stick does nothing during the intro
         if game.state != INTRO:
             break
-        assert frame.flags & g3d.FLAG_NO_HUD and game.player.hp == 5
+        assert frame.flags & screen.FLAG_NO_HUD and game.player.hp == 5
         fades.append(frame.rigs[0].fade)
         dist.append(math.hypot(game.player.x - game.boss.x, game.player.z - game.boss.z))
     assert game.state == FIGHT
@@ -72,9 +73,9 @@ def test_intro_rides_up_to_the_boss_then_hands_over():
 
 def test_a_skips_the_intro():
     game = Game(world.make_scene(1), W)
-    game.step(raw(pressed=g3d.BTN_A), DT)
+    game.step(raw(pressed=controls.BTN_A), DT)
     game.step(raw(), DT)
-    game.step(raw(pressed=g3d.BTN_A), DT)
+    game.step(raw(pressed=controls.BTN_A), DT)
     assert game.state == FIGHT and (game.player.x, game.player.z) == FIGHT_SPAWN
     assert game.step(raw(), DT).rigs[0].fade == 0.0
 
@@ -92,14 +93,14 @@ def test_stick_forward_walks_away_from_camera():
 def test_holding_b_fires_at_cooldown_rate():
     game = started()
     for _ in range(6):  # 0.3 s with a 0.25 s cooldown -> two shots
-        frame = game.step(raw(held=g3d.BTN_B), DT)
+        frame = game.step(raw(held=controls.BTN_B), DT)
     assert game.player.shots == 2
     assert sum(o.mesh == 1 for o in frame.objects) == 2  # both tracers still flying
 
 
 def test_tap_shorter_than_a_frame_still_fires():
     game = started()
-    game.step(raw(pressed=g3d.BTN_B), DT)
+    game.step(raw(pressed=controls.BTN_B), DT)
     assert game.player.shots == 1
 
 
@@ -107,30 +108,30 @@ def test_menu_navigation_and_restart():
     game = started()
     for _ in range(10):
         game.step(raw(jy=120), DT)
-    game.step(raw(pressed=g3d.BTN_START), DT)
+    game.step(raw(pressed=controls.BTN_START), DT)
     assert game.state == MENU
     hud = game.step(raw(jy=-120), DT).hud  # stick down -> Restart
-    assert hud.state == g3d.STATE_PAUSED and hud.msg == 10
-    game.step(raw(pressed=g3d.BTN_A), DT)
+    assert hud.state == screen.STATE_PAUSED and hud.msg == 10
+    game.step(raw(pressed=controls.BTN_A), DT)
     assert game.state == READY and (game.player.x, game.player.z) == READY_SPAWN
 
 
 def test_menu_continue_resumes():
     game = started()
-    game.step(raw(pressed=g3d.BTN_START), DT)
-    game.step(raw(pressed=g3d.BTN_A), DT)  # Continue
+    game.step(raw(pressed=controls.BTN_START), DT)
+    game.step(raw(pressed=controls.BTN_A), DT)  # Continue
     assert game.state == FIGHT
-    game.step(raw(pressed=g3d.BTN_START), DT)
-    game.step(raw(pressed=g3d.BTN_START), DT)  # Start again closes it
+    game.step(raw(pressed=controls.BTN_START), DT)
+    game.step(raw(pressed=controls.BTN_START), DT)  # Start again closes it
     assert game.state == FIGHT
 
 
 def test_a_does_not_pause_and_start_also_starts():
     game = started()
-    game.step(raw(pressed=g3d.BTN_A), DT)
+    game.step(raw(pressed=controls.BTN_A), DT)
     assert game.state == FIGHT  # A is not the menu key any more
     fresh = Game(world.make_scene(1), W)
-    fresh.step(raw(pressed=g3d.BTN_START), DT)
+    fresh.step(raw(pressed=controls.BTN_START), DT)
     assert fresh.state == INTRO
 
 
@@ -164,7 +165,7 @@ def test_shooting_does_not_turn_the_horse():
     yaw = game.player.yaw
     game.camera.yaw += 1.0  # look well off to the side, then shoot
     for _ in range(3):
-        game.step(raw(held=g3d.BTN_B), DT)
+        game.step(raw(held=controls.BTN_B), DT)
     assert game.player.tracers and game.player.yaw == yaw
 
 
@@ -206,14 +207,14 @@ def test_each_round_fits_two_legs_the_back_and_the_head():
     assert len(combos) > 5
 
 
-def test_restart_picks_new_parts_and_bumps_scene_version():
+def test_restart_picks_new_parts():
     game = Game(world.make_scene(1), W, seed=3)
-    first, version = list(game.scene.slot_variants), game.scene_version
+    first = list(game.scene.slot_variants)
     seen = {tuple(first)}
     for _ in range(5):
         game.restart()
         seen.add(tuple(game.scene.slot_variants))
-    assert game.scene_version == version + 5 and len(seen) > 1
+    assert len(seen) > 1
 
 
 def test_frame_carries_the_boss_rig():
@@ -226,25 +227,20 @@ def test_frame_carries_the_boss_rig():
 
 def test_tap_during_cooldown_fires_when_it_ends():
     game = started()
-    game.step(raw(pressed=g3d.BTN_B), DT)
-    game.step(raw(pressed=g3d.BTN_B), DT)  # 0.05 s later, still cooling down
+    game.step(raw(pressed=controls.BTN_B), DT)
+    game.step(raw(pressed=controls.BTN_B), DT)  # 0.05 s later, still cooling down
     assert game.player.shots == 1
     for _ in range(5):
         game.step(raw(), DT)
     assert game.player.shots == 2
 
 
-def test_frame_objects_fit_the_packet():
-    from player import MAX_TRACERS
-    assert 1 + MAX_TRACERS + 1 <= g3d.MAX_OBJ  # hook, tracers, shockwave (sparks are particles now)
-
-
 def test_music_follows_the_round():
     game = Game(world.make_scene(1), W)
     assert game.music() == ("bgm_battle", 0.5)  # Ready: the theme, softer
-    game.step(raw(pressed=g3d.BTN_A), DT)
+    game.step(raw(pressed=controls.BTN_A), DT)
     assert game.music() == ("bgm_battle", 1.0)  # the intro: full volume
-    game.step(raw(pressed=g3d.BTN_A), DT)  # skip it
+    game.step(raw(pressed=controls.BTN_A), DT)  # skip it
     game.player.hp = 0
     game.step(raw(), DT)
     assert game.state == "lose" and game.music() == ("jingle_defeat", 1.0)
@@ -252,7 +248,7 @@ def test_music_follows_the_round():
 
 def test_shots_hits_and_breaks_become_sound_events():
     game = started()
-    game.step(raw(pressed=g3d.BTN_B), DT)
+    game.step(raw(pressed=controls.BTN_B), DT)
     assert [n for n, _ in game.sounds] == ["shot"]
     for _ in range(20):  # the tracer lands
         game.step(raw(), DT)
@@ -269,7 +265,7 @@ def test_effects_play_through_the_mixer():
     from arena import ENGINE
     fx = sfx.Effects(ENGINE)
     assert set(fx.sounds) == set(sfx.LEVELS)  # every sound is built (tools/sfx_build.py)
-    view = g3d.Camera(0, 2, 0, yaw=0.0)
+    view = screen.Camera(0, 2, 0, yaw=0.0)
     fx.play([("shot", (0, 2, 5)), ("stomp", (500, 0, 0))], view)  # the stomp is past FAR: not heard
     assert ENGINE.audio.voices == 1
     ENGINE.audio.mix(48000)

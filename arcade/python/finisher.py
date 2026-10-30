@@ -14,7 +14,7 @@ import math
 
 import aim
 import assets
-import g3d
+import screen
 import world
 from controls import Input
 from gen import mesh_ids, palette
@@ -148,7 +148,7 @@ class Finisher:
         has `spark_orb` (art.md §6)."""
         out = []
         if self.flash > 0:
-            out.append(g3d.Obj(mesh_ids.SPARK, *self._hand(), scale=FLASH_SCALE, tint=palette.FLASH))
+            out.append(screen.Obj(mesh_ids.SPARK, *self._hand(), scale=FLASH_SCALE, tint=palette.FLASH))
         return out
 
     def view(self):
@@ -165,4 +165,4 @@ class Finisher:
         x, z = target[0] + math.sin(heading) * flat, target[2] + math.cos(heading) * flat
         y = max(target[1] + dist * math.sin(CAMERA_ELEVATION), world.terrain_height(boss.scene, x, z) + 1.0)
         dx, dy, dz = target[0] - x, target[1] - y, target[2] - z
-        return g3d.Camera(x, y, z, yaw=math.atan2(dx, dz), pitch=math.atan2(dy, math.hypot(dx, dz)))
+        return screen.Camera(x, y, z, yaw=math.atan2(dx, dz), pitch=math.atan2(dy, math.hypot(dx, dz)))

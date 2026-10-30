@@ -20,7 +20,8 @@ import alia_engine as ae
 import assets
 import camera
 import collide
-import g3d
+import controls
+import screen
 import tilt_config as tilt
 import world
 from gen import mesh_ids, palette
@@ -238,7 +239,7 @@ class Player:
         self.since_hit += dt
         self.since_land += dt
         self.loose_time += dt
-        if inp.pressed & g3d.BTN_C:
+        if inp.pressed & controls.BTN_C:
             self._hook_button(aim, boss)
         if self.hook in (PULLING, HOOKED):
             pass  # carried by the hook
@@ -251,8 +252,8 @@ class Player:
         self.cooldown = max(0.0, self.cooldown - dt)
         # Holding B fires at the cooldown rate; a tap shorter than a frame only shows in `pressed`,
         # and a tap during the cooldown is kept until it ends.
-        self.queued = self.queued or bool(inp.pressed & g3d.BTN_B)
-        if (self.queued or inp.held & g3d.BTN_B) and self.cooldown <= 1e-6 and len(self.tracers) < MAX_TRACERS:
+        self.queued = self.queued or bool(inp.pressed & controls.BTN_B)
+        if (self.queued or inp.held & controls.BTN_B) and self.cooldown <= 1e-6 and len(self.tracers) < MAX_TRACERS:
             self.queued = False
             self._shoot(aim, boss)
         self._advance(dt, boss)
@@ -359,8 +360,8 @@ class Player:
     def hook_block(self):
         """api.md §3.3 Hook block: bit0 rope visible, bit1 hooked on; anchor = the hook head."""
         if self.hook is None:
-            return g3d.Hook()
-        return g3d.Hook(flags=1 | (2 if self.hook == HOOKED else 0), x=self.hook_head[0], y=self.hook_head[1],
+            return screen.Hook()
+        return screen.Hook(flags=1 | (2 if self.hook == HOOKED else 0), x=self.hook_head[0], y=self.hook_head[1],
                         z=self.hook_head[2])
 
     def thrown(self, away, damage, speed=7.0, up=5.0):
@@ -436,26 +437,26 @@ class Player:
     def _horse_block(self):
         """The horse: under the rider, fading out after the rider left it, or fading in before touchdown."""
         if self.mounted:
-            return g3d.Rig(HORSE_ID, *self._horse_anim(), x=self.x, y=self.y, z=self.z, yaw=self.yaw, char_light=True)
+            return screen.Rig(HORSE_ID, *self._horse_anim(), x=self.x, y=self.y, z=self.z, yaw=self.yaw, char_light=True)
         if self.airborne:  # time to land under gravity, from y + vy t - g t^2 / 2 = ground
             drop = self.y - world.terrain_height(self.scene, self.x, self.z)
             t = (self.vy + math.sqrt(self.vy * self.vy + 2 * GRAVITY * max(drop, 0.0))) / GRAVITY
             if t < FADE_IN:
                 ground = self.y - drop
-                return g3d.Rig(HORSE_ID, HORSE_ANIM["gallop"], int(self.loose_time * GALLOP_RATE) & 255,
+                return screen.Rig(HORSE_ID, HORSE_ANIM["gallop"], int(self.loose_time * GALLOP_RATE) & 255,
                                x=self.x, y=ground, z=self.z, yaw=self.yaw, char_light=True, fade=t / FADE_IN)
         if self.loose and self.loose_time < FADE_OUT:
             x, y, z, yaw, speed = self.loose
             d = speed * SPEED * self.loose_time
             x, z = x + math.sin(yaw) * d, z + math.cos(yaw) * d
-            return g3d.Rig(HORSE_ID, HORSE_ANIM["gallop"], int(self.loose_time * GALLOP_RATE) & 255,
+            return screen.Rig(HORSE_ID, HORSE_ANIM["gallop"], int(self.loose_time * GALLOP_RATE) & 255,
                            x=x, y=world.terrain_height(self.scene, x, z), z=z, yaw=yaw, char_light=True,
                            fade=self.loose_time / FADE_OUT)
         return None
 
     def rigs(self):
         """[horse or None, rider] rig blocks, both under the character light."""
-        rider = g3d.Rig(RIDER_ID, *self._rider_anim(), x=0, y=0, z=0, yaw=self.yaw, char_light=True)
+        rider = screen.Rig(RIDER_ID, *self._rider_anim(), x=0, y=0, z=0, yaw=self.yaw, char_light=True)
         rider.x, rider.y, rider.z = self._rider_origin()
         return [self._horse_block(), rider]
 
@@ -463,10 +464,10 @@ class Player:
         objs = []
         if self.hook in (FLYING, RETURNING):
             d = tuple(b - a for a, b in zip(self.hook_from, self.hook_to))
-            objs.append(g3d.Obj(mesh_ids.HOOK_HEAD, *self.hook_head, yaw=math.atan2(d[0], d[2]),
+            objs.append(screen.Obj(mesh_ids.HOOK_HEAD, *self.hook_head, yaw=math.atan2(d[0], d[2]),
                                 pitch=-math.atan2(d[1], math.hypot(d[0], d[2])), scale=HOOK_SCALE))
         for t in self.tracers:
             horizontal = math.hypot(t.vx, t.vz)
-            objs.append(g3d.Obj(mesh_ids.BULLET, t.x, t.y, t.z, yaw=math.atan2(t.vx, t.vz),
+            objs.append(screen.Obj(mesh_ids.BULLET, t.x, t.y, t.z, yaw=math.atan2(t.vx, t.vz),
                                 pitch=-math.atan2(t.vy, horizontal), scale=3.0))  # long streak: readable at 240x160
         return objs

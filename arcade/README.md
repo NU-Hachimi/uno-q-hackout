@@ -1,5 +1,10 @@
 # Arcade: build a game for the UNO Q console
 
+> **`alia-pad` branch**: Megalith here is ported to Alia Pad and runs on [alia-engine](https://github.com/SaltyfishAlpha/alia-engine)
+> as a cart (`make cart install launch`); see [docs/alia-port.md](docs/alia-port.md). The App Lab / MCU version
+> (the sketch, the g3d protocol, `app.yaml`) is removed on this branch and stays on `main`, as does everything
+> below about App Lab. RetroArch (`retroarch/`) is unchanged and still needs the App Lab starter from `main`.
+
 [All tracks](../README.md) · [Pre-work](PREWORK.md) · [Arduino references](PREWORK.md#arduino-references) · [Terminal commands](#terminal-commands) · [Hardware reference](#hardware-reference)
 
 Build a game with a clear objective, physical controls, an ending, and a restart. The console arrives **preassembled** with an Arduino UNO Q, Modulino Joystick, Buttons and Movement, a printed body, and the DIYables 3.5-inch TFT.

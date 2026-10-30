@@ -3,7 +3,7 @@ import random
 
 import aim
 import camera
-import g3d
+import screen
 import world
 from arena import W
 from boss import KNEELING, STANDING, STRIKING, TURNING, Boss, pick_parts
@@ -127,11 +127,11 @@ def test_aim_assist_snaps_to_a_visible_part():
     # Look 2 degrees to the side of the part's centre.
     yaw = math.atan2(centre[0] - eye[0], centre[2] - eye[2]) + math.radians(2)
     pitch = math.atan2(centre[1] - eye[1], math.hypot(centre[0] - eye[0], centre[2] - eye[2]))
-    view = g3d.Camera(*eye, yaw=yaw, pitch=pitch, fov=camera.FOV)
+    view = screen.Camera(*eye, yaw=yaw, pitch=pitch, fov=camera.FOV)
     result = aim.compute(view, boss)
     assert result.flags & aim.FLAG_PART and result.target.slot == slot
     assert abs(result.dx) > 3  # the reticle moved off centre towards the part
-    far = g3d.Camera(*eye, yaw=yaw + math.radians(20), pitch=pitch, fov=camera.FOV)
+    far = screen.Camera(*eye, yaw=yaw + math.radians(20), pitch=pitch, fov=camera.FOV)
     assert aim.compute(far, boss).flags == 0
 
 
@@ -167,7 +167,7 @@ def test_feet_block_the_pc_but_the_belly_does_not():
     pc = Player(scene, W, x=fx, z=fz - 3)
     from controls import Input
     for _ in range(40):  # walk straight at the foot
-        view = g3d.Camera(pc.x, 2, pc.z - 6, yaw=0.0)
+        view = screen.Camera(pc.x, 2, pc.z - 6, yaw=0.0)
         pc.update(Input(move_y=1.0), camera.ThirdPersonCamera(0.0), 0.05, boss,
                   aim.Aim((0, 0, 0), (0, 0, 1)))
         assert math.hypot(pc.x - fx, pc.z - fz) >= r - 1e-6

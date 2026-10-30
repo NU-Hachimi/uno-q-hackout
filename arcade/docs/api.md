@@ -1,5 +1,9 @@
 # g3d API v1
 
+> **`alia-pad` 分支上这份文档只是历史**：MCU 渲染器（`sketch/`）、这份协议（`python/g3d.py`）和 App Lab 都已经去掉，Megalith 跑在
+> alia-engine 上（`alia-port.md`）。协议里的数据记录（Camera、Obj、Hud、Hook、Rig）留在 `python/screen.py`，按键和 RawInput 在
+> `python/controls.py`，SceneDef 在 `python/world.py`。原版在 `main` 分支。
+
 [文档索引](README.md) · [策划](plan.md) · [调研](research.md) · [分工](workflow.md)
 
 这份文档是渲染端（MCU，sketch）和玩法端（MPU，Python）之间的**唯一契约**。修改 §2–§5 需要双方同意，并递增协议版本号 `G3D_VERSION`。

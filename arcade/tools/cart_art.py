@@ -16,7 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python"))
 import alia_engine as ae  # noqa: E402
 
 import assets  # noqa: E402
-import g3d  # noqa: E402
+import controls  # noqa: E402
+import screen  # noqa: E402
 import world  # noqa: E402
 from alia_view import View  # noqa: E402
 from game import Game  # noqa: E402
@@ -25,7 +26,7 @@ DT = 1 / 30
 
 
 def raw(jx=0, jy=0, held=0, pressed=0, rx=0, ry=0):
-    return g3d.RawInput(0, 7, held, pressed, jx, jy, 0, 0, 1000, 0, 0, 0, 0, rx, ry)
+    return controls.RawInput(0, 7, held, pressed, jx, jy, 0, 0, 1000, 0, 0, 0, 0, rx, ry)
 
 
 def step(engine, game, r):
@@ -42,7 +43,7 @@ def fight(engine, scene, day, before=None):
     if before is not None:
         before.close()
     game = Game(scene, engine.world, seed=7)
-    for r in (raw(pressed=g3d.BTN_A), raw(), raw(pressed=g3d.BTN_A)):
+    for r in (raw(pressed=controls.BTN_A), raw(), raw(pressed=controls.BTN_A)):
         step(engine, game, r)
     game.day = day
     return game
@@ -63,7 +64,7 @@ def shoot(engine, view, game, path, hud=True, steps=1, inputs=raw):
     for _ in range(steps):
         frame = step(engine, game, inputs())
     if not hud:
-        frame.flags |= g3d.FLAG_NO_HUD
+        frame.flags |= screen.FLAG_NO_HUD
     view.set_sky(*world.sky_at(game.day))
     view.update(frame, game.player.hand())
     view.draw(frame)

@@ -5,11 +5,35 @@ import math
 from dataclasses import dataclass
 
 import tilt_config as tilt
-from g3d import BTN_A, BTN_B, BTN_C, BTN_START, BTN_STICK
 from preview import DEAD_ZONE, INVERT_X, INVERT_Y
 
+# Buttons as the game reads them (main.py makes them from alia-engine's input actions).
+BTN_A, BTN_B, BTN_C, BTN_STICK, BTN_START = 1, 2, 4, 8, 16
+
+
+@dataclass
+class RawInput:
+    """One step's controller reading, in the units of the console the game was written for (raw stick
+    -127..127 with +y up); main.py builds it from alia-engine's actions. The accelerometer and gyro fields
+    are the hackathon console's tilt look, unused since the right stick replaced it."""
+    seq_ack: int
+    connected: int   # bit0 Buttons, bit1 Joystick, bit2 Movement
+    held: int        # BTN_* bits held right now
+    pressed: int     # BTN_* bits pressed since the previous step
+    jx: int
+    jy: int
+    ax: int          # mg, raw, includes gravity
+    ay: int
+    az: int
+    gx: int          # deg/s / 4 (optional, may be 0)
+    gy: int
+    render_ms: int
+    push_ms: int
+    rx: int = 0      # right stick, -127..127, +x right, +y up
+    ry: int = 0
+
 STICK_FULL = 120  # raw stick reading treated as full deflection
-LOOK_FULL = 127   # right stick full deflection (g3d.RawInput rx, ry)
+LOOK_FULL = 127   # right stick full deflection (RawInput rx, ry)
 
 
 @dataclass

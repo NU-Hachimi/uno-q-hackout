@@ -22,7 +22,7 @@ help:
 	@printf '%s\n' \
 	  'make run           Play on the PC (window; keyboard or gamepad)' \
 	  'make test          Python tests (in a headless alia-engine built for the PC)' \
-	  'make gen           Regenerate python/gen and sketch/gen from assets/' \
+	  'make gen           Regenerate python/gen (and python/sfx) from assets/' \
 	  'make cart          Board cart: build/cart/ and build/megalith.acart' \
 	  'make cart-pc       The same cart for the PC (simulator): build/cart-pc/' \
 	  'make install       Install build/megalith.acart on the board (acart --board install)' \

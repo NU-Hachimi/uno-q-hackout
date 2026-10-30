@@ -3,7 +3,7 @@ a look offset on top; riding without tilt eases it back behind the horse (tilt_c
 
 import math
 
-import g3d
+import screen
 import tilt_config as tilt
 import world
 
@@ -51,10 +51,10 @@ class ThirdPersonCamera:
             self.yaw += delta * min(1.0, tilt.RECENTER_RATE * dt)
 
     def view(self, player, scene):
-        """g3d.Camera looking along (yaw, pitch) from behind the PC."""
+        """screen.Camera looking along (yaw, pitch) from behind the PC."""
         d, r = forward(self.yaw, self.pitch), right(self.yaw)
         x = player.x - d[0] * DISTANCE + r[0] * SHOULDER
         z = player.z - d[2] * DISTANCE + r[2] * SHOULDER
         y = player.y + PIVOT_HEIGHT + LIFT - d[1] * DISTANCE
         y = max(y, world.terrain_height(scene, x, z) + GROUND_CLEARANCE)
-        return g3d.Camera(x, y, z, self.yaw, self.pitch, FOV)
+        return screen.Camera(x, y, z, self.yaw, self.pitch, FOV)

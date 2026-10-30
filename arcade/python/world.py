@@ -1,13 +1,36 @@
-"""Scene generation and terrain queries shared by the game and the scene upload."""
+"""Scene generation and terrain queries: the terrain, the rocks, the day cycle."""
 
 import math
 import random
 import struct
+from dataclasses import dataclass, field
 
-from g3d import SceneDef
 from gen import mesh_ids
 from gen.looks import LOOKS
 from gen.palette import SCENE_DEFAULTS
+
+@dataclass
+class SceneDef:
+    heights: list            # terrain_n² ints in -127..127, row-major (z rows, x columns)
+    terrain_n: int = 17
+    cell: float = 16.0       # m
+    origin_x: float = -128.0  # m, corner of vertex (0, 0)
+    origin_z: float = -128.0
+    height_scale: int = 1    # 1/16 m per height unit
+    sky_top: int = 0
+    sky_horizon: int = 0
+    fog_color: int = 0
+    fog_near: float = 40.0   # m
+    fog_far: float = 120.0   # m, also the far clip plane
+    grass_a: int = 0
+    grass_b: int = 0
+    light_yaw: int = 0       # BAM8
+    light_pitch: int = 0     # BAM8
+    rig_id: int = 0
+    slot_variants: list = field(default_factory=list)
+    rocks: list = field(default_factory=list)  # (x, z, yaw_rad, scale, mesh_id, tint)
+    look: bytes = b""        # 76 B Look block (gen/looks.py), or empty for the default
+
 
 TERRAIN_N = 17
 CELL = 16.0        # m; 256 m square, so the 120 m fog limit never shows the map edge

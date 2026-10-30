@@ -1,6 +1,6 @@
 """main.py turns alia-engine input actions into the RawInput the game reads."""
 
-import g3d
+import controls
 from main import ACTIONS, raw_input
 
 
@@ -20,7 +20,7 @@ class FakeActions:
 
 def test_actions_become_game_buttons_and_sticks():
     raw = raw_input(FakeActions(held={"shoot", "hook"}, pressed={"pause"}, ride=(0.5, -1.0), look=(-1.0, 0.25)), 9)
-    assert raw.held == g3d.BTN_B | g3d.BTN_C and raw.pressed == g3d.BTN_START and raw.seq_ack == 9
+    assert raw.held == controls.BTN_B | controls.BTN_C and raw.pressed == controls.BTN_START and raw.seq_ack == 9
     assert (raw.jx, raw.jy, raw.rx, raw.ry) == (64, 127, -127, -32)  # stick up (-y) reads positive
 
 

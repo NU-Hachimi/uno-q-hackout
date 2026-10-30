@@ -21,7 +21,7 @@ import alia_engine as ae
 
 import assets
 import collide
-import g3d
+import screen
 import world
 from gen import mesh_ids, palette
 from gen.rigs import RIGS
@@ -302,7 +302,7 @@ class Boss:
 
     def objects(self):
         """The dust rings on the ground (art.md §6)."""
-        return [g3d.Obj(mesh_ids.SHOCKWAVE_RING, x, y + RING_LIFT, z, scale=max(r, 0.1) / RING_MESH_RADIUS, tint=palette.DUST)
+        return [screen.Obj(mesh_ids.SHOCKWAVE_RING, x, y + RING_LIFT, z, scale=max(r, 0.1) / RING_MESH_RADIUS, tint=palette.DUST)
                 for x, y, z, r, _, _ in self.waves]
 
     def jump_off_warning(self, player):
@@ -449,6 +449,6 @@ class Boss:
         return sum(self.hp.values()) / self.hp_total
 
     def rig_block(self):
-        return g3d.Rig(rig_id=RIG_ID, anim=self.anim, phase=self.phase(),
+        return screen.Rig(rig_id=RIG_ID, anim=self.anim, phase=self.phase(),
                        hit_slot=self.hit_slot if self.hit_timer > 0 else 0xFF,
                        x=self.x, y=self.y, z=self.z, yaw=self.yaw, part_alive=self.alive, fade=self.fade)

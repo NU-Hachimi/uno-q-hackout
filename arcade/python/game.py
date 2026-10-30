@@ -6,10 +6,9 @@ player has control. A during the intro skips to the end of it."""
 
 import math
 import random
-from dataclasses import dataclass
 
 import aim as aiming
-import g3d
+import screen
 import world
 from boss import Boss, pick_parts
 from camera import ThirdPersonCamera
@@ -49,21 +48,6 @@ INTRO_ARRIVE = 0.3           # m; this close to the spawn hands over control
 INTRO_REVEAL = 2.0           # s for the boss's extra fade to clear after the intro starts (then only fog)
 
 
-@dataclass
-class Frame:
-    """Everything the MCU needs for one frame."""
-    camera: g3d.Camera
-    objects: list
-    hud: g3d.Hud
-    rigs: list           # boss, horse, rider (api.md §3.3)
-    hook: g3d.Hook
-    flags: int = 0
-
-    def pack(self, seq):
-        return g3d.pack_frame(seq, self.camera, self.objects, self.hud, rigs=self.rigs, hook=self.hook,
-                              flags=self.flags)
-
-
 class Game:
     def __init__(self, scene, w, seed=None):
         """`w`: the alia_engine.World the round plays in (the boss's rig and colliders, the ground)."""
@@ -71,27 +55,26 @@ class Game:
         self.w = w
         world.set_ground(w, scene)
         self.rng = random.Random(seed)
-        self.scene_version = 0  # bumped when the scene (part variants) must be uploaded again
         self.day = 0.0           # s on the day-cycle clock (world.sky_at); runs in Ready and Fight
-        self.sky_sent = None     # last g3d_scene_sky payload; None makes the next sky_update() send
+        self.sky_sent = None     # the sky last handed out; None makes the next sky_update() hand it out
         self.sky_wait = 0.0
         self.controls = Controls()
         self.restart()
 
     def sky_update(self, dt):
-        """g3d_scene_sky payload when the sky has changed since the last one sent (at most every SKY_PERIOD)."""
+        """world.sky_at() of now when the sky has changed since the last one handed out (at most every
+        SKY_PERIOD), else None."""
         self.sky_wait -= dt
         if self.sky_wait > 0:
             return None
-        payload = g3d.pack_sky(*world.sky_at(self.day))
-        if payload == self.sky_sent:
+        sky = world.sky_at(self.day)
+        if sky == self.sky_sent:
             return None
-        self.sky_sent, self.sky_wait = payload, SKY_PERIOD
-        return payload
+        self.sky_sent, self.sky_wait = sky, SKY_PERIOD
+        return sky
 
     def restart(self):
         self.scene.slot_variants = pick_parts(self.rng)
-        self.scene_version += 1
         if getattr(self, "boss", None):
             self.close()
         self.boss = Boss(self.scene, self.w, random.Random(self.rng.random()))
@@ -275,33 +258,33 @@ class Game:
         if self.shake_time > 0:
             fade = self.shake_time / SHAKE_SECONDS
             view.y += self.shake * fade * math.sin(self.time * 2 * math.pi * SHAKE_HZ)
-        hud = g3d.Hud(hp=self.player.hp, hp_max=HP_MAX, timer=min(255, int(self.time)),
+        hud = screen.Hud(hp=self.player.hp, hp_max=HP_MAX, timer=min(255, int(self.time)),
                       boss_hp=max(1, round(self.boss.health() * 255)) if self.boss.health() > 0 else 0)
         flags = 0
         if self.state == READY:
-            hud.state, hud.msg = g3d.STATE_READY, MSG_PRESS_A
+            hud.state, hud.msg = screen.STATE_READY, MSG_PRESS_A
         elif self.state == INTRO:
-            hud.state, hud.msg = g3d.STATE_FIGHT, 0
-            flags |= g3d.FLAG_NO_HUD
+            hud.state, hud.msg = screen.STATE_FIGHT, 0
+            flags |= screen.FLAG_NO_HUD
         elif self.state == FIGHT:
             msg = self.objective()  # warnings and the finisher prompt beat the opening hint
-            hud.state, hud.msg = g3d.STATE_FIGHT, msg if msg in (MSG_JUMP_OFF, MSG_FINISH) or self.hint <= 0 else MSG_HINT
+            hud.state, hud.msg = screen.STATE_FIGHT, msg if msg in (MSG_JUMP_OFF, MSG_FINISH) or self.hint <= 0 else MSG_HINT
             if self.aim:
                 hud.reticle_dx, hud.reticle_dy, hud.reticle_flags = self.aim.dx, self.aim.dy, self.aim.flags
             if self.player.hurt_flash > 0:
-                flags |= g3d.FLAG_HURT
+                flags |= screen.FLAG_HURT
         elif self.state == EXECUTE:
-            hud.state, flags = g3d.STATE_FIGHT, flags | g3d.FLAG_NO_HUD  # a clean cutscene
+            hud.state, flags = screen.STATE_FIGHT, flags | screen.FLAG_NO_HUD  # a clean cutscene
         elif self.state == MENU:
-            hud.state, hud.msg = g3d.STATE_PAUSED, MSG_MENU[self.menu_item]
+            hud.state, hud.msg = screen.STATE_PAUSED, MSG_MENU[self.menu_item]
         elif self.state == WIN:
-            hud.state, hud.msg = g3d.STATE_WIN, MSG_VICTORY
+            hud.state, hud.msg = screen.STATE_WIN, MSG_VICTORY
         elif self.state == LOSE:
-            hud.state, hud.msg = g3d.STATE_LOSE, MSG_DEFEATED
+            hud.state, hud.msg = screen.STATE_LOSE, MSG_DEFEATED
         else:
-            hud.state, hud.msg = g3d.STATE_PAUSED, MSG_MISSING
-        objects = self.boss.objects() + self.player.objects()  # rings first: MAX_OBJ cuts the tail
+            hud.state, hud.msg = screen.STATE_PAUSED, MSG_MISSING
+        objects = self.boss.objects() + self.player.objects()
         hook = self.player.hook_block()
         if self.state == EXECUTE:  # the hook is in the rider's hand, not on a rope
-            objects, hook = (self.finisher.objects() + self.player.objects())[:g3d.MAX_OBJ], g3d.Hook()
-        return Frame(view, objects, hud, self.rigs(), hook, flags)
+            objects, hook = self.finisher.objects() + self.player.objects(), screen.Hook()
+        return screen.Frame(view, objects, hud, self.rigs(), hook, flags)
