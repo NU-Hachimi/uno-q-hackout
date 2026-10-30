@@ -126,6 +126,14 @@ class View:
         self.palette = list(pal.PALETTE_565)  # graded by the current Look
         self.light = (0.0, -1.0, 0.0)
         self.set_sky(*world.blend_sky(world.TIME_OF_DAY[0], world.TIME_OF_DAY[0], 0.0))
+        # What never moves lives in alia-engine's world (its docs/api.md §3): the terrain (its mesh is
+        # rebuilt when the sky changes, the node stays) and the scattered rocks. Moving things are still
+        # drawn per frame until the rigs move into the engine too (E4 step 4).
+        engine.world.spawn(self.terrain)
+        for x, z, yaw, scale, mesh_id, tint in scene.rocks:
+            if mesh_id in self.meshes:
+                engine.world.spawn(self.meshes[mesh_id], position=(x, world.terrain_height(scene, x, z), z), yaw=yaw,
+                                   scale=scale, tint=tint)
 
     # ---- assets -------------------------------------------------------------------------------
     def _load_meshes(self):
@@ -200,25 +208,14 @@ class View:
         f.character.ambient, f.character.diffuse = CHAR_AMBIENT, CHAR_DIFFUSE
         f.overlay = rgba(pal.PALETTE_565[pal.HURT], HURT_ALPHA) if frame.flags & g3d.FLAG_HURT else 0
 
-        e.draw(self.terrain, (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0))
         hand = None
         for k, block in enumerate(frame.rigs):
             hand = self._rig(block, k == 0) or hand
         for o in frame.objects:
             self._mesh(o.mesh, _object_model(o.x, o.y, o.z, o.yaw, o.pitch, o.scale), o.tint)
-        for mesh, model, tint in self._rock_models():
-            self._mesh(mesh, model, tint)
         self._rope(frame.hook, hand, cam)
         if not frame.flags & g3d.FLAG_NO_HUD:
             self._hud(frame.hud)
-
-    def _rock_models(self):
-        """The scattered scenery never moves: build its matrices once per scene."""
-        if getattr(self, "_rocks_for", None) is not self.scene.rocks:
-            self._rocks_for = self.scene.rocks
-            self._rocks = [(mesh, _object_model(x, world.terrain_height(self.scene, x, z), z, yaw, 0.0, scale), tint)
-                           for x, z, yaw, scale, mesh, tint in self.scene.rocks]
-        return self._rocks
 
     def _mesh(self, mesh_id, model, tint=0, light=ae.Light.MATERIAL, fade=0.0):
         handle = self.meshes.get(mesh_id)
