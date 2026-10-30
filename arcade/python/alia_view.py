@@ -15,10 +15,11 @@ import alia_engine as ae
 import g3d
 import rig
 import world
+from gen import mesh_ids
 from gen import palette as pal
 from gen.rigs import RIGS
 
-MESH_PACK = Path(__file__).resolve().parent / "gen" / "meshes.bin"
+MESH_PACK = Path(__file__).resolve().parent / "gen" / "meshes.apak"  # alia-engine resource pack (tools/mesh_build.py)
 _LOOK = struct.Struct("<32HBBBbBHHBBB")
 
 # Lights and materials (sketch/render.cpp).
@@ -123,22 +124,9 @@ class View:
 
     # ---- assets -------------------------------------------------------------------------------
     def _load_meshes(self):
-        data = MESH_PACK.read_bytes()
-        if data[:4] != b"AMP1":
-            raise RuntimeError(f"{MESH_PACK}: not a mesh pack (run tools/mesh_build.py)")
-        (count,), at, ids = struct.unpack_from("<H", data, 4), 6, {}
-        for _ in range(count):
-            mid, nv, nt = struct.unpack_from("<BHH", data, at)
-            at += 5
-            pos = data[at:at + 12 * nv]
-            at += 12 * nv
-            tris = data[at:at + 6 * nt]
-            at += 6 * nt
-            colors = data[at:at + nt]
-            at += nt
-            if nt:
-                ids[mid] = self.e.create_mesh(ae.Mesh(pos, tris, tri_palette=colors))
-        return ids
+        """Mesh id (gen/mesh_ids.py) -> engine mesh, from the resource pack."""
+        by_name = self.e.load_meshes(str(MESH_PACK))
+        return {mid: by_name[name] for mid, name in mesh_ids.NAMES.items() if name in by_name}
 
     def _terrain_mesh(self, grass_a, grass_b):
         s = self.scene

@@ -38,6 +38,46 @@ HORSE_TAIL = 43
 HORSE_LEG = 44
 HORSE_SHIN = 45
 
+# Mesh id -> name (the entry names in meshes.apak).
+NAMES = {
+    0: 'pc',
+    1: 'bullet',
+    2: 'boss_shot',
+    3: 'hook_head',
+    4: 'spark',
+    5: 'shockwave_ring',
+    16: 'moose_torso',
+    17: 'moose_neck',
+    18: 'moose_head',
+    19: 'moose_leg_f',
+    20: 'moose_leg_b',
+    21: 'moose_shin',
+    22: 'armor_plate_a',
+    23: 'armor_plate_b',
+    24: 'crystal_a',
+    25: 'crystal_b',
+    26: 'armor_back',
+    27: 'head_cap',
+    28: 'sigil_weak',
+    29: 'rock_a',
+    30: 'rock_b',
+    31: 'pillar_broken',
+    32: 'arch_fragment',
+    33: 'pc_hips',
+    34: 'pc_chest',
+    35: 'pc_head',
+    36: 'pc_arm',
+    37: 'pc_arm_r',
+    38: 'pc_thigh',
+    39: 'pc_shin',
+    40: 'horse_body',
+    41: 'horse_neck',
+    42: 'horse_head',
+    43: 'horse_tail',
+    44: 'horse_leg',
+    45: 'horse_shin',
+}
+
 # Bounding radius around each mesh origin, metres.
 RADIUS = {
     0: 1.6879,

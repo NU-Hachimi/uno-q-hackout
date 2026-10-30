@@ -52,11 +52,11 @@ test:
 	"$(PYTHON)" -m pytest -q tests
 
 gen:
-	"$(PYTHON)" tools/mesh_build.py
+	ALIA_ENGINE="$(ALIA_ENGINE)" "$(PYTHON)" tools/mesh_build.py
 	"$(PYTHON)" tools/rig_build.py
 
 cart: engine-board engine-pc
-	"$(PYTHON)" tools/mesh_build.py --check
+	ALIA_ENGINE="$(ALIA_ENGINE)" "$(PYTHON)" tools/mesh_build.py --check
 	PYTHON="$(PYTHON)" sh tools/cart_build.sh $(ENGINE_BOARD) $(ENGINE_PC) $(CART_DIR)
 	"$(ACART)" check $(CART_DIR)
 	"$(ACART)" pack $(CART_DIR) -o $(CART_FILE)

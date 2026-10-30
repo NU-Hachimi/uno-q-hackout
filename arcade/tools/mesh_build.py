@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Turn assets/ (meshes, palette, Looks) into sketch/gen/ and python/gen/.
 
-python/gen/meshes.bin is the mesh pack alia-engine loads (python/alia_view.py); the same
-triangles as sketch/gen/meshes.h:
-    "AMP1", u16 count, then per mesh: u8 id, u16 n_verts, u16 n_tris,
-    f32 xyz[n_verts], u16 tri[n_tris][3], u8 palette_index[n_tris]   (little-endian)
+python/gen/meshes.apak is the same triangles as sketch/gen/meshes.h in alia-engine's resource
+pack format (alia-engine docs/formats.md), written with alia-engine's tools/alia_pack.py; the
+entries are named after the meshes (gen/mesh_ids.py NAMES maps ids to names). ALIA_ENGINE
+points at the alia-engine checkout (default ~/Projects/alia-engine).
 
     python3 tools/mesh_build.py          (run from arcade/; rewrites the generated files)
     python3 tools/mesh_build.py --check  (exit 1 if the generated files are stale)
@@ -16,11 +16,13 @@ names and their Kd must match the palette colour (api.md §5.2, art.md §8).
 import argparse
 import json
 import math
-import struct
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, os.path.join(os.environ.get("ALIA_ENGINE", os.path.expanduser("~/Projects/alia-engine")), "tools"))
+from alia_pack import PackWriter  # noqa: E402
 ASSETS = ROOT / "assets"
 DEFAULT_LOOK = "forbidden_plain"
 KD_TOLERANCE = 1.5 / 255
@@ -246,7 +248,9 @@ def build():
 
     out = [f'"""{header}"""', "", "# Mesh ids (api.md §5.3)."]
     out += [f"{meshes[mid][0]['name'].upper()} = {mid}" for mid in sorted(meshes)]
-    out += ["", "# Bounding radius around each mesh origin, metres.", "RADIUS = {"]
+    out += ["", "# Mesh id -> name (the entry names in meshes.apak).", "NAMES = {"]
+    out += [f"    {mid}: {meshes[mid][0]['name']!r}," for mid in sorted(meshes)]
+    out += ["}", "", "# Bounding radius around each mesh origin, metres.", "RADIUS = {"]
     out += [f"    {mid}: {meshes[mid][1]['radius']:.4f}," for mid in sorted(meshes)]
     out += ["}", "", "# Attachment points in mesh space, metres."]
     for mid in sorted(meshes):
@@ -271,17 +275,14 @@ def build():
     out += ["}", ""]
     looks_py = "\n".join(out)
 
-    pack = bytearray(b"AMP1" + struct.pack("<H", len(meshes)))
+    pack = PackWriter()
     for mid in sorted(meshes):
         mesh = meshes[mid][1]
-        colors = [g[0] for g in mesh["groups"] for _ in range(g[1])]
-        pack += struct.pack("<BHH", mid, len(mesh["verts"]), len(mesh["tris"]))
-        pack += struct.pack(f"<{3 * len(mesh['verts'])}f", *(c for v in mesh["verts"] for c in v))
-        pack += struct.pack(f"<{3 * len(mesh['tris'])}H", *(i for t in mesh["tris"] for i in t))
-        pack += bytes(colors)
+        pack.add_mesh(meshes[mid][0]["name"], [c for v in mesh["verts"] for c in v], [i for t in mesh["tris"] for i in t],
+                      tri_palette=[g[0] for g in mesh["groups"] for _ in range(g[1])])
 
     return {
-        ROOT / "python" / "gen" / "meshes.bin": bytes(pack),
+        ROOT / "python" / "gen" / "meshes.apak": pack.bytes(),
         ROOT / "python" / "gen" / "looks.py": looks_py,
         ROOT / "sketch" / "gen" / "meshes.h": meshes_h,
         ROOT / "sketch" / "gen" / "palette.h": palette_h,
