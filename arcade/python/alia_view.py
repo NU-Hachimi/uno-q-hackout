@@ -211,13 +211,20 @@ class View:
             hand = self._rig(block, k == 0) or hand
         for o in frame.objects:
             self._mesh(o.mesh, _object_model(o.x, o.y, o.z, o.yaw, o.pitch, o.scale), o.tint)
-        for x, z, yaw, scale, mesh, tint in self.scene.rocks:
-            y = world.terrain_height(self.scene, x, z)
-            self._mesh(mesh, _object_model(x, y, z, yaw, 0.0, scale), tint)
+        for mesh, model, tint in self._rock_models():
+            self._mesh(mesh, model, tint)
         self._rope(frame.hook, hand, cam)
         if not frame.flags & g3d.FLAG_NO_HUD:
             self._hud(frame.hud)
         e.end_frame()
+
+    def _rock_models(self):
+        """The scattered scenery never moves: build its matrices once per scene."""
+        if getattr(self, "_rocks_for", None) is not self.scene.rocks:
+            self._rocks_for = self.scene.rocks
+            self._rocks = [(mesh, _object_model(x, world.terrain_height(self.scene, x, z), z, yaw, 0.0, scale), tint)
+                           for x, z, yaw, scale, mesh, tint in self.scene.rocks]
+        return self._rocks
 
     def _mesh(self, mesh_id, model, tint=0, light=ae.Light.SUN, fade=0.0):
         handle = self.meshes.get(mesh_id)
