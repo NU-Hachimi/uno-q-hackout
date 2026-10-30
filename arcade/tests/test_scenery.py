@@ -2,6 +2,7 @@ import math
 
 import g3d
 import world
+from arena import W
 from gen import mesh_ids
 from gen.looks import LOOKS
 
@@ -40,7 +41,7 @@ def test_day_cycle_holds_each_look_then_blends():
 
 def test_sky_update_only_while_changing():
     from game import Game
-    game = Game(world.make_scene(1))
+    game = Game(world.make_scene(1), W)
     assert game.sky_update(0.05)  # first call always sends
     game.day = 1.0
     assert game.sky_update(1.0) is None  # still holding noon: nothing new

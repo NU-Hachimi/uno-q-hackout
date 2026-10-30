@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "pyt
 
 import alia_engine as ae  # noqa: E402
 
+import assets  # noqa: E402
 import audio  # noqa: E402
 import g3d  # noqa: E402
 import world  # noqa: E402
@@ -66,8 +67,9 @@ class Megalith:
 
     def init(self, engine):
         self.scene = world.make_scene(seed=1, look=world.TIME_OF_DAY[0])
-        self.game = Game(self.scene)
-        self.view = View(engine, self.scene)
+        self.view = View(engine, self.scene)  # first: it loads the meshes the rigs are drawn with
+        assets.load(engine)
+        self.game = Game(self.scene, engine.world)
         self.music = audio.Music()
         self.seq = 0
         self.frame = self.game.step(None, 0.0)  # something to draw before the first step

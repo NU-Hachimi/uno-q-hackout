@@ -29,7 +29,6 @@ SHOT_COOLDOWN = 0.25    # s
 SHOT_RANGE = 80.0       # m
 TRACER_SPEED = 120.0    # m/s; the hit lands when the streak arrives
 MAX_TRACERS = 3
-GROUND_STEP = 1.0       # m between terrain samples along a shot
 MAX_SPARKS = 4          # objects per frame: hook 1 + tracers 3 + sparks 4 + boss shockwave 1 = 9
 HIT_SPARK_LIFE = 0.25   # s
 DEBRIS_LIFE = 0.6       # s
@@ -114,8 +113,7 @@ class Player:
         self.tracers = []
         self.sparks = []
         self.hook = None       # FLYING / RETURNING / PULLING / HOOKED, or None
-        self.hook_bone = -1    # boss bone the hook holds, with the anchor in that bone's frame
-        self.hook_local = (0.0, 0.0, 0.0)
+        self.hook_anchor = None  # the boss's hook point node the hook holds (it moves with the bone), if any
         self.hook_from = (0.0, 0.0, 0.0)  # hand position when fired
         self.hook_to = (0.0, 0.0, 0.0)    # world point the hook flies to
         self.hook_head = (0.0, 0.0, 0.0)  # where the hook head is drawn while flying
@@ -194,7 +192,7 @@ class Player:
         poses = rig.pose(RIDER, *self._rider_anim())
         return rig.transform(rig.compose(world_rig, rig.attach_matrix(RIDER, poses, "hand")), (0, 0, 0))
 
-    def update(self, inp, cam, dt, boss, aim, colliders):
+    def update(self, inp, cam, dt, boss, aim):
         """C fires or releases the hook; the stick walks (on the ground only); B shoots along `aim`."""
         self.invulnerable = max(0.0, self.invulnerable - dt)
         self.hurt_flash = max(0.0, self.hurt_flash - dt)
@@ -219,7 +217,7 @@ class Player:
         self.queued = self.queued or bool(inp.pressed & g3d.BTN_B)
         if (self.queued or inp.held & g3d.BTN_B) and self.cooldown <= 1e-6 and len(self.tracers) < MAX_TRACERS:
             self.queued = False
-            self._shoot(aim, colliders)
+            self._shoot(aim, boss)
         self._advance(dt, boss)
 
     def _walk(self, inp, cam, dt, boss):
@@ -270,21 +268,18 @@ class Player:
         self.hook_time = 0.0
         self.hook = FLYING
         if aim.hook is not None:
-            self.hook_bone = aim.hook.collider.bone
+            self.hook_anchor = aim.hook.collider.node  # rides the bone, so the hook lands on the brow wherever it moved
             self.hook_to = aim.hook.point
-            bones, _ = boss.poses()  # the anchor rides the bone, so the hook lands on the brow wherever it moved
-            self.hook_local = rig.transform(rig.inverse(bones[self.hook_bone]), self.hook_to)
             self.yaw = math.atan2(self.hook_to[0] - self.x, self.hook_to[2] - self.z)
         else:
-            self.hook_bone = -1
+            self.hook_anchor = None
             d = aim.direction
             self.hook_to = tuple(a + b * HOOK_RANGE for a, b in zip(self.hook_from, d))
             self.yaw = math.atan2(d[0], d[2])
 
     def anchor(self, boss):
         """World position of the hook's anchor on the boss (it moves with the bone)."""
-        bones, _ = boss.poses()
-        return rig.transform(bones[self.hook_bone], self.hook_local)
+        return boss.position_of(self.hook_anchor)
 
     def _update_hook(self, dt, boss):
         if self.hook is None:
@@ -292,11 +287,11 @@ class Player:
         self.hook_time += dt
         t = min(1.0, self.hook_time / HOOK_FLIGHT)
         if self.hook == FLYING:
-            if self.hook_bone >= 0:
+            if self.hook_anchor is not None:
                 self.hook_to = self.anchor(boss)
             self.hook_head = tuple(a + (b - a) * t for a, b in zip(self.hook_from, self.hook_to))
             if t >= 1.0:
-                if self.hook_bone >= 0:
+                if self.hook_anchor is not None:
                     # The rider leaves the saddle: the horse runs on and fades out; the PC point becomes the feet.
                     self.loose, self.loose_time = (self.x, self.y, self.z, self.yaw, max(self.speed, 0.6)), 0.0
                     self.x, self.y, self.z = self._rider_origin()
@@ -350,19 +345,12 @@ class Player:
         self.invulnerable, self.hurt_flash, self.since_hit = INVULNERABLE, HURT_FLASH, 0.0
         return True
 
-    def _ground_t(self, o, d, limit):
-        t = GROUND_STEP
-        while t < limit:
-            if o[1] + d[1] * t <= world.terrain_height(self.scene, o[0] + d[0] * t, o[2] + d[2] * t):
-                return t
-            t += GROUND_STEP
-        return None
-
-    def _shoot(self, aim, colliders):
-        """Resolve the shot now (hitscan) and send a tracer from the hand to where it lands."""
+    def _shoot(self, aim, boss):
+        """Resolve the shot now (hitscan) and send a tracer from the hand to where it lands: the boss, the
+        ground (alia-engine's, from the same terrain) or nothing."""
         o, d = aim.origin, aim.direction
-        hit = collide.ray_cast(o, d, colliders, SHOT_RANGE)
-        ground = self._ground_t(o, d, hit.t if hit else SHOT_RANGE)
+        hit = boss.ray_cast(o, d, SHOT_RANGE)
+        ground = boss.w.ray_ground(o, d, hit.t if hit else SHOT_RANGE)
         slot, tint = -1, palette.DUST
         if ground is not None:
             end = tuple(a + b * ground for a, b in zip(o, d))

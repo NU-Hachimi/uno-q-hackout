@@ -4,8 +4,8 @@ import random
 import aim
 import camera
 import g3d
-import rig
 import world
+from arena import W
 from boss import Boss, pick_parts
 from controls import Input
 from gen import palette
@@ -18,7 +18,7 @@ DT = 0.05
 def setup(seed=3):
     scene = world.make_scene(1)
     scene.slot_variants = pick_parts(random.Random(seed))
-    boss = Boss(scene, random.Random(0))
+    boss = Boss(scene, W, random.Random(0))
     return scene, boss
 
 
@@ -38,9 +38,8 @@ def hook_view(boss, pc):
 
 
 def step(pc, boss, inp=Input(), view=None):
-    colliders = boss.colliders()
-    a = aim.compute(view, colliders, pc.hand(), boss.hook_targets()) if view else aim.Aim((0, 0, 0), (0, 0, 1))
-    pc.update(inp, camera.ThirdPersonCamera(0.0), DT, boss, a, colliders)
+    a = aim.compute(view, boss, pc.hand()) if view else aim.Aim((0, 0, 0), (0, 0, 1))
+    pc.update(inp, camera.ThirdPersonCamera(0.0), DT, boss, a)
     return a
 
 
@@ -131,7 +130,7 @@ def test_hooked_shots_do_double_damage():
     eye = part.centre()[0], part.centre()[1] + 4, part.centre()[2] + 1
     d = tuple((b - a) / math.dist(eye, part.centre()) for a, b in zip(eye, part.centre()))
     before = boss.hp[back]
-    pc._shoot(aim.Aim(eye, d), boss.colliders())
+    pc._shoot(aim.Aim(eye, d), boss)
     for _ in range(10):
         pc._advance(DT, boss)
     assert boss.hp[back] == before - 2
@@ -151,16 +150,14 @@ def raw(pressed=0):
 
 def hook_on_brow(pc, boss):
     brow = boss.hook_targets()[1]
-    bones, _ = boss.poses()
-    pc.hook, pc.hook_bone = HOOKED, brow.bone
-    pc.hook_local = rig.transform(rig.inverse(bones[brow.bone]), brow.centre())
+    pc.hook, pc.hook_anchor = HOOKED, brow.node
     pc.x, pc.y, pc.z = brow.centre()
 
 
 def test_finisher_prompts_then_b_plays_it_and_wins():
     from finisher import EXECUTE_SECONDS, HIT_STOP, SLOW
     from game import EXECUTE, MSG_FINISH
-    game = Game(world.make_scene(1), seed=1)
+    game = Game(world.make_scene(1), W, seed=1)
     game.step(raw(g3d.BTN_A), DT)
     game.step(raw(g3d.BTN_A), DT)  # skip the intro
     boss, pc = game.boss, game.player
@@ -196,7 +193,7 @@ def test_finisher_prompts_then_b_plays_it_and_wins():
     assert game.state == READY
 
 def test_losing_all_health_loses():
-    game = Game(world.make_scene(1), seed=1)
+    game = Game(world.make_scene(1), W, seed=1)
     game.step(raw(g3d.BTN_A), DT)
     game.step(raw(g3d.BTN_A), DT)  # skip the intro
     game.player.hp = 0

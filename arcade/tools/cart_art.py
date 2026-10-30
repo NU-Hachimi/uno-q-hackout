@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python"))
 
 import alia_engine as ae  # noqa: E402
 
+import assets  # noqa: E402
 import g3d  # noqa: E402
 import world  # noqa: E402
 from alia_view import View  # noqa: E402
@@ -27,9 +28,12 @@ def raw(jx=0, jy=0, held=0, pressed=0, rx=0, ry=0):
     return g3d.RawInput(0, 7, held, pressed, jx, jy, 0, 0, 1000, 0, 0, 0, 0, rx, ry)
 
 
-def fight(scene, day):
-    """A fresh round with the ride-in skipped, at `day` seconds into the day cycle."""
-    game = Game(scene, seed=7)
+def fight(engine, scene, day, before=None):
+    """A fresh round with the ride-in skipped, at `day` seconds into the day cycle (`before`, the last
+    round, is taken out of the world)."""
+    if before is not None:
+        before.close()
+    game = Game(scene, engine.world, seed=7)
     for r in (raw(pressed=g3d.BTN_A), raw(), raw(pressed=g3d.BTN_A)):
         game.step(r, DT)
     game.day = day
@@ -66,22 +70,23 @@ def main():
 
     engine = ae.Engine(headless=True, size=(1280, 720))
     view = View(engine, scene)
+    assets.load(engine)
     # Cover: the boss towering over the rider, low and to the side, in the afternoon light.
-    game = fight(scene, day=6.0)
+    game = fight(engine, scene, day=6.0)
     boss = game.boss
     look_at(game, (boss.x, boss.y + 7, boss.z), 24, side=0.5)
     shoot(engine, view, game, out / "cover.png", hud=False)
     # Background (behind the Shell while the cart is selected): dusk, further out.
-    game = fight(scene, day=world.DAY_HOLD + world.DAY_BLEND + 6.0)
+    game = fight(engine, scene, day=world.DAY_HOLD + world.DAY_BLEND + 6.0, before=game)
     look_at(game, (boss.x, boss.y + 6, boss.z), 44, side=-0.4)
     shoot(engine, view, game, out / "background.png", hud=False)
     # Screenshots with the HUD: riding in, aiming at a part, at night.
-    game = fight(scene, day=6.0)
+    game = fight(engine, scene, day=6.0, before=game)
     shoot(engine, view, game, out / "screenshots" / "1_ride.png", steps=30, inputs=lambda: raw(jx=-30, jy=100))
     part = next(c for c in game.boss.colliders() if c.slot == game.boss.parts[0]).centre()
     look_at(game, part, 14)
     shoot(engine, view, game, out / "screenshots" / "2_aim.png")
-    game = fight(scene, day=2 * (world.DAY_HOLD + world.DAY_BLEND) + 6.0)
+    game = fight(engine, scene, day=2 * (world.DAY_HOLD + world.DAY_BLEND) + 6.0, before=game)
     look_at(game, (game.boss.x, game.boss.y + 5, game.boss.z), 30, side=0.3)
     shoot(engine, view, game, out / "screenshots" / "3_night.png")
     engine.close()
@@ -89,7 +94,8 @@ def main():
     # Icon: the boss's head, square, at a chunky 128x128 shown twice as large.
     engine = ae.Engine(headless=True, size=(256, 256), internal=(128, 128))
     view = View(engine, scene)
-    game = fight(scene, day=6.0)
+    assets.load(engine)
+    game = fight(engine, scene, day=6.0)
     boss = game.boss
     look_at(game, (boss.x, boss.y + 9, boss.z), 16, side=0.35)
     game.camera.pitch += 0.12

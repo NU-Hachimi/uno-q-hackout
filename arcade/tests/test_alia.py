@@ -29,3 +29,14 @@ def test_engine_poses_match_rig_py():
         assert worst < 1e-5  # float32 against Python's doubles
     finally:
         engine.close()
+
+
+def test_engine_ground_matches_terrain_height():
+    import world
+    from arena import W
+
+    scene = world.make_scene(1)
+    world.set_ground(W, scene)
+    for x in range(-130, 131, 7):
+        for z in range(-130, 131, 11):
+            assert abs(W.ground_height(x, z) - world.terrain_height(scene, x, z)) < 1e-4

@@ -64,8 +64,11 @@ class Frame:
 
 
 class Game:
-    def __init__(self, scene, seed=None):
+    def __init__(self, scene, w, seed=None):
+        """`w`: the alia_engine.World the round plays in (the boss's rig and colliders, the ground)."""
         self.scene = scene
+        self.w = w
+        world.set_ground(w, scene)
         self.rng = random.Random(seed)
         self.scene_version = 0  # bumped when the scene (part variants) must be uploaded again
         self.day = 0.0           # s on the day-cycle clock (world.sky_at); runs in Ready and Fight
@@ -88,7 +91,9 @@ class Game:
     def restart(self):
         self.scene.slot_variants = pick_parts(self.rng)
         self.scene_version += 1
-        self.boss = Boss(self.scene, random.Random(self.rng.random()))
+        if getattr(self, "boss", None):
+            self.boss.close()
+        self.boss = Boss(self.scene, self.w, random.Random(self.rng.random()))
         self.player = Player(self.scene, *READY_SPAWN, yaw=math.pi / 2, seed=self.rng.random())  # riding towards +X
         self.ready_to = READY_TURNS
         self.camera = ThirdPersonCamera(self.player.yaw)
@@ -130,7 +135,12 @@ class Game:
             self._execute(dt)
         elif self.state in (WIN, LOSE) and inp.pressed & BTN_A:
             self.restart()
+        self.boss.present()
         return self._frame()
+
+    def close(self):
+        """Take the round out of the world."""
+        self.boss.close()
 
     def _ready(self, inp, dt):
         self.boss.idle(dt)
@@ -162,7 +172,7 @@ class Game:
         turn = (math.atan2(x - p.x, z - p.z) - p.yaw + math.pi) % (2 * math.pi) - math.pi if steer else 0.0
         self.camera.turn(Input(), dt)
         # turning right lowers yaw, so a positive turn needs the stick to the left
-        p.update(Input(move_x=max(-1.0, min(1.0, -2.0 * turn)), move_y=throttle), self.camera, dt, self.boss, None, [])
+        p.update(Input(move_x=max(-1.0, min(1.0, -2.0 * turn)), move_y=throttle), self.camera, dt, self.boss, None)
         self.camera.follow(p, dt)
 
     def _fight_begins(self):
@@ -189,10 +199,8 @@ class Game:
         if self.boss.finish_ready(self.player) and (inp.pressed | inp.held) & BTN_B:
             self.finisher, self.state = Finisher(self), EXECUTE  # B finishes instead of shooting
             return
-        colliders = self.boss.colliders()
-        self.aim = aiming.compute(self.camera.view(self.player, self.scene), colliders, self.player.hand(),
-                                  self.boss.hook_targets())
-        self.player.update(inp, self.camera, dt, self.boss, self.aim, colliders)
+        self.aim = aiming.compute(self.camera.view(self.player, self.scene), self.boss, self.player.hand())
+        self.player.update(inp, self.camera, dt, self.boss, self.aim)
         self.camera.follow(self.player, dt)
         for _, pos, tint in self.boss.broken:
             self.player.debris(pos, tint)

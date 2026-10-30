@@ -1,6 +1,6 @@
 # Megalith 移植到 Alia Pad：现状和路线图
 
-> 2026-10-29。`alia-pad` 分支。引擎是 [alia-engine](https://github.com/SaltyfishAlpha/alia-engine)，接口见它的 `docs/api.md`，阶段见它的 `docs/architecture.md` §6.1（E4 的 8 步）。
+> 2026-10-30。`alia-pad` 分支。引擎是 [alia-engine](https://github.com/SaltyfishAlpha/alia-engine)，接口见它的 `docs/api.md`，阶段见它的 `docs/architecture.md` §6.1（E4 的 8 步）。
 
 ## 1. 为什么现在看起来乱
 
@@ -20,10 +20,12 @@
 |---|---|---|
 | `main.py` | 入口：一个 `Game` 类交给 `alia_engine.run`；`fixed_update` 里跑 `game.step`，`render` 里画 | 保留，更薄 |
 | `game.py` | 一局的状态机（Ready → Intro → Fight ⇄ Menu → Execute → Win/Lose），每步调度玩家、BOSS、相机、瞄准，最后拼出 `Frame` | 保留；"拼 Frame"那部分去掉 |
-| `player.py`、`boss.py`、`finisher.py` | 玩法实体：骑行、射击、钩锁；BOSS 的 AI 和部件；处决演出 | 保留，直接持有引擎里的物体 |
+| `player.py`、`boss.py`、`finisher.py` | 玩法实体：骑行、射击、钩锁；BOSS 的 AI 和部件；处决演出。BOSS 已经直接持有引擎里的 rig（第 5 步） | 保留，直接持有引擎里的物体 |
 | `camera.py`、`aim.py`、`controls.py` | 相机怎么跟、瞄准吸附、输入映射 | 保留（玩法逻辑）；相机结果直接写引擎的 `world.camera`，输入直接读引擎 |
 | `world.py` | **Megalith 自己的世界**：地形高度、竞技场、石头散布、昼夜循环。和引擎的 `engine.world` 无关，名字撞了 | 改名 `terrain.py` |
-| `rig.py`、`collide.py` | rig 姿态、碰撞查询 | 第 4、5 步换成引擎的 C++ 版本（`rig.py` 留作黄金数据的参考实现） |
+| `rig.py` | rig 姿态（Python 参考实现） | 留作黄金数据的参考；马和骑手的手、马鞍位置还在用它，第 8 步换成 Player 持有的引擎 rig |
+| `collide.py` | 碰撞的**分类**：BODY / PART / HOOK 层、`Collider`（骨骼号、槽号）、`push_out`。形状和射线在引擎里 | 保留（玩法逻辑） |
+| `assets.py` | 把 `gen/rigs.apak` 加载进引擎一次 | 保留 |
 | `g3d.py` | 原来的通信协议：数据结构 + 打包函数（打包函数现在只有测试在用） | 第 8 步删掉 |
 | `alia_view.py` | 翻译层：Frame → 引擎；Look 调色、地形烘焙、绳子、HUD 排版 | 拆成 `look.py`（调色、天色）和 `hud.py`（HUD），其余删掉 |
 | `tilt_config.py`、`preview.py` | 手感参数（名字还是"倾斜"）、摇杆死区 | 合并成 `tuning.py` |
@@ -59,14 +61,14 @@ tuning.py     手感参数（原 tilt_config.py + preview.py）
 | 1 资源 | 网格从自定义格式换成 `meshes.apak` | ✅ |
 | 2 材质 | 地形、绳子用材质，不再每次 `draw()` 传参数 | ✅ |
 | 3 世界 | 地形、石头变成常驻物体 | ✅ |
-| 4 动画 | 三个 rig 变成引擎的 rig 物体（C++ 求姿态，和 `rig.py` 对照差在 10⁻⁶ 以内，`tests/test_alia.py`）；子弹、火花、尘环、钩头是世界里的物体（`alia_view.py` 里按网格分的对象池；它们在两帧之间没有身份，所以不插值）；相机写 `world.camera`；绳子是世界里的物体。`alia_view.py` 分成 `update`（逻辑步里同步世界，引擎插值）和 `draw`（只画 HUD）。玩法里的碰撞体、手和马鞍的位置仍然用 `rig.py`，第 5 步换掉 | ✅ |
-| 5 碰撞 | `collide.py` 换成引擎的碰撞体和射线 | |
+| 4 动画 | 三个 rig 变成引擎的 rig 物体（C++ 求姿态，和 `rig.py` 对照差在 10⁻⁶ 以内，`tests/test_alia.py`）；子弹、火花、尘环、钩头是世界里的物体（`alia_view.py` 里按网格分的对象池；它们在两帧之间没有身份，所以不插值）；相机写 `world.camera`；绳子是世界里的物体。`alia_view.py` 分成 `update`（逻辑步里同步世界，引擎插值）和 `draw`（只画 HUD）。玩法里的碰撞体、手和马鞍的位置仍然用 `rig.py`（碰撞体第 5 步换掉了，手和马鞍见第 8 步） | ✅ |
+| 5 碰撞 | BOSS 持有自己的引擎 rig（`boss.node`），每步摆好位置和姿态；碰撞体在资源包里（`rig_build.py` 把 JSON 的碰撞体标成层：骨骼 BODY、部件 PART 且平局优先、user 是骨骼号或槽号；马和骑手的碰撞体不在任何层上），两个钩点是骨骼上的 HOOK 球。射击、瞄准吸附、钩点遮挡、BOSS 的脚、动画事件、钩锁的锚点、处决的弱点全部问引擎；子弹打地面用引擎的高度图（`world.set_ground`，和 `terrain_height` 同一个面，`tests/test_alia.py` 对照）。部件打碎时关掉它的碰撞体。`alia_view.py` 不再管 BOSS（`boss.present()` 自己隐藏、淡出、闪烁）。`collide.py` 只剩分类；测试在一个无头引擎里跑（`tests/arena.py`）。玩法里的高度查询（骑行、相机）还是 Python 的 `terrain_height`，第 8 步和 `terrain.py` 一起定 | ✅ |
 | 6 粒子 | 火花、碎片换成粒子发射器（去掉 MCU 时代的 `MAX_SPARKS = 4`） | |
 | 7 系统 | `audio.py` 换成引擎的混音器；按键映射用引擎的动作映射 | |
-| 8 收尾 | 去掉 `Frame` 和 `g3d.py`，拆分 `alia_view.py`，改名（`world.py` → `terrain.py` 等） | |
+| 8 收尾 | 去掉 `Frame` 和 `g3d.py`，拆分 `alia_view.py`，改名（`world.py` → `terrain.py` 等）；Player 持有马和骑手的 rig（手、马鞍问引擎，`rig.py` 只留给测试） | |
 
 ## 5. 怎么验收
 
-- `make test`：79 个玩法测试。
+- `make test`：82 个玩法测试，在无头的 alia-engine 里跑（先编译 `build/engine-pc`；BOSS 的 rig 和碰撞体在引擎的世界里）。
 - `tools/snapshot.py OUT --alia`：44 张关键帧，和上一版逐像素比对。画面确实会变的步骤（插值让运动更平滑、C++ 和 Python 的浮点差异）改成"关掉插值时一致，或者只差在边缘像素"，并在提交说明里写明差了多少。
 - 板上：`make cart install launch`，`--stats` 看 `update_ms`、`render_ms`。

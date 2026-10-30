@@ -3,8 +3,9 @@
 so tests/cpp/render_preview.sh --snapshots can render them with the MCU renderer.
 
     python3 tools/snapshot.py OUT_DIR
-    python3 tools/snapshot.py OUT_DIR --alia   also NAME.alia.png from alia-engine (python/alia_view.py),
-                                               headless; alia_engine must be importable (PYTHONPATH)
+    python3 tools/snapshot.py OUT_DIR --alia   also NAME.alia.png from alia-engine (python/alia_view.py)
+
+alia_engine must be importable (PYTHONPATH): the game plays in its world (headless) either way.
 """
 
 import struct
@@ -15,6 +16,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python"))
 
 import math  # noqa: E402
 
+import alia_engine  # noqa: E402
+
+import assets  # noqa: E402
 import g3d  # noqa: E402
 import world  # noqa: E402
 from boss import CHARGING, STRIKING  # noqa: E402
@@ -41,14 +45,23 @@ def main():
     out = Path(sys.argv[1])
     out.mkdir(parents=True, exist_ok=True)
     scene = world.make_scene(seed=1)
-    game = Game(scene, seed=7)  # picks this round's parts into scene.slot_variants
-    write_scene(out / "scene.bin", scene)
-    seq = 0
+    engine = alia_engine.Engine(headless=True)
     view = None
     if "--alia" in sys.argv[2:]:
-        import alia_engine
         from alia_view import View
-        view = View(alia_engine.Engine(headless=True), scene)
+        view = View(engine, scene)  # before the game: it loads the meshes the boss's rig is drawn with
+    assets.load(engine)
+    game = None
+
+    def new_game():
+        """A fresh round (same seed: the same parts), the last one taken out of the world."""
+        if game is not None:
+            game.close()
+        return Game(scene, engine.world, seed=7)
+
+    game = new_game()  # picks this round's parts into scene.slot_variants
+    write_scene(out / "scene.bin", scene)
+    seq = 0
 
     def save(name, frame):
         (out / f"{name}.frame").write_bytes(frame.pack(seq))
@@ -122,7 +135,7 @@ def main():
     run("14_victory", [raw()])
     # The day cycle at 8 points (holds and blends) on a fresh round; NAME.sky next to NAME.frame is a
     # g3d_scene_sky payload that render_preview.sh applies after the scene.
-    game = Game(scene, seed=7)
+    game = new_game()
     skip_intro = [raw(pressed=g3d.BTN_A, held=g3d.BTN_A), raw(), raw(pressed=g3d.BTN_A, held=g3d.BTN_A)]
     run("15_ride", skip_intro + [raw(jx=-30, jy=100)] * 20 + [raw(held=g3d.BTN_B)] * 3)
     period = world.DAY_HOLD + world.DAY_BLEND
@@ -142,7 +155,7 @@ def main():
         steps += 1
     run("17_stomp_ring", [raw()])
     # Mid-charge: the PC 30 m away gets run at, head down
-    game = Game(scene, seed=7)
+    game = new_game()
     for r in skip_intro:  # Ready -> Intro -> Fight
         game.step(r, DT)
     boss = game.boss
@@ -167,7 +180,7 @@ def main():
         seq += 1
 
     # Boss attacks on a fresh round (same seed, so the same parts as scene.bin).
-    game = Game(scene, seed=7)
+    game = new_game()
     run("19_0_start", skip_intro)
     boss, p = game.boss, game.player
     p.x, p.z = 0.0, -6.0  # by the forelegs: close enough for the stomp
@@ -193,15 +206,12 @@ def main():
     run_until("21_1_rising", lambda: boss.state == "rising" and boss.phase() > 120, limit=400)
 
     # The finisher: every part broken, hooked on the shoulder hump, then B.
-    import rig as rigmath  # noqa: E402
     for slot in boss.parts:
         boss.damage(slot, 99)
     boss.broken.clear()
     run_until("22_0_standing_again", lambda: boss.state == "standing", limit=400)
     hump = boss.hook_targets()[0]
-    bones, _ = boss.poses()
-    p.hook, p.hook_bone = "hooked", hump.bone
-    p.hook_local = rigmath.transform(rigmath.inverse(bones[hump.bone]), hump.centre())
+    p.hook, p.hook_anchor = "hooked", hump.node
     p.x, p.y, p.z = hump.centre()
     run("22_1_finish_prompt", [raw()])
     run("23_execute_leap", [raw(pressed=g3d.BTN_B)] + [raw()] * 8)

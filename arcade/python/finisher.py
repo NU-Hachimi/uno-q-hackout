@@ -70,9 +70,7 @@ class Finisher:
 
     def weak_point(self):
         """World position of the boss's weak point (the `head_weak` attach)."""
-        boss = self.game.boss
-        bones, _ = boss.poses()
-        return rig.transform(rig.attach_matrix(boss.rig, bones, "head_weak"), (0, 0, 0))
+        return self.game.boss.attach_position("head_weak")
 
     def _hand(self):
         player = self.game.player
@@ -104,7 +102,7 @@ class Finisher:
                     self._event(event)
             player._advance(gdt, boss)  # sparks and debris
         else:  # falling back into the saddle like after letting go
-            player.update(Input(), game.camera, gdt, boss, aim.Aim((0, 0, 0), (0, 0, 1)), [])
+            player.update(Input(), game.camera, gdt, boss, aim.Aim((0, 0, 0), (0, 0, 1)))
 
         self._advance_orbs(gdt)
         if self.after is None:
@@ -179,8 +177,7 @@ class Finisher:
         reach out sideways and back, so they stay out of the shot); it pulls back to the body while the boss dies."""
         boss = self.game.boss
         head = self.weak_point()
-        bones, _ = boss.poses()
-        body = rig.transform(bones[0], (0, 0, 0))
+        body = boss.bone_position(0)
         k = _ease((self.after or 0.0) / DIE)
         target = tuple(a + (b - a) * k for a, b in zip(head, body))
         heading = boss.yaw - CAMERA_AROUND  # turning right lowers yaw

@@ -2,6 +2,7 @@ import math
 
 import g3d
 import world
+from arena import W
 from controls import Controls
 from game import FIGHT, FIGHT_SPAWN, INTRO, MENU, MISSING, READY, READY_SPAWN, Game
 
@@ -14,7 +15,7 @@ def raw(jx=0, jy=0, held=0, pressed=0, connected=7, accel=(0, 0, 1000), rx=0, ry
 
 def started():
     """A fight with the intro skipped (A starts it, A again skips it)."""
-    game = Game(world.make_scene(1))
+    game = Game(world.make_scene(1), W)
     game.step(raw(pressed=g3d.BTN_A), DT)
     game.step(raw(pressed=g3d.BTN_A), DT)
     assert game.state == FIGHT
@@ -22,7 +23,7 @@ def started():
 
 
 def test_ready_shows_prompt_and_a_starts():
-    game = Game(world.make_scene(1))
+    game = Game(world.make_scene(1), W)
     frame = game.step(raw(), DT)
     assert game.state == READY and frame.hud.state == g3d.STATE_READY and frame.hud.msg == 1
     assert frame.objects == []  # the PC is drawn as rigs: horse and rider
@@ -33,7 +34,7 @@ def test_ready_shows_prompt_and_a_starts():
 
 
 def test_ready_rides_back_and_forth_beyond_the_fog_with_the_boss_hidden():
-    game = Game(world.make_scene(1))
+    game = Game(world.make_scene(1), W)
     xs = []
     for _ in range(2400):  # 2 minutes: long enough to turn back at both ends
         frame = game.step(raw(), DT)
@@ -49,7 +50,7 @@ def test_ready_rides_back_and_forth_beyond_the_fog_with_the_boss_hidden():
 
 
 def test_intro_rides_up_to_the_boss_then_hands_over():
-    game = Game(world.make_scene(1))
+    game = Game(world.make_scene(1), W)
     for _ in range(40):
         game.step(raw(), DT)
     game.step(raw(pressed=g3d.BTN_A), DT)
@@ -70,7 +71,7 @@ def test_intro_rides_up_to_the_boss_then_hands_over():
 
 
 def test_a_skips_the_intro():
-    game = Game(world.make_scene(1))
+    game = Game(world.make_scene(1), W)
     game.step(raw(pressed=g3d.BTN_A), DT)
     game.step(raw(), DT)
     game.step(raw(pressed=g3d.BTN_A), DT)
@@ -194,7 +195,7 @@ def test_each_round_fits_two_legs_the_back_and_the_head():
 
 
 def test_restart_picks_new_parts_and_bumps_scene_version():
-    game = Game(world.make_scene(1), seed=3)
+    game = Game(world.make_scene(1), W, seed=3)
     first, version = list(game.scene.slot_variants), game.scene_version
     seen = {tuple(first)}
     for _ in range(5):
@@ -227,7 +228,7 @@ def test_frame_objects_fit_the_packet():
 
 
 def test_music_follows_the_round():
-    game = Game(world.make_scene(1))
+    game = Game(world.make_scene(1), W)
     assert game.music() == ("bgm_battle", 0.5)  # Ready: the theme, softer
     game.step(raw(pressed=g3d.BTN_A), DT)
     assert game.music() == ("bgm_battle", 1.0)  # the intro: full volume

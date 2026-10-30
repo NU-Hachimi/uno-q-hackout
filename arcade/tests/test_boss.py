@@ -5,21 +5,20 @@ import aim
 import camera
 import g3d
 import world
-import rig
+from arena import W
 from boss import KNEELING, STANDING, STRIKING, TURNING, Boss, pick_parts
 from player import Player
 
 
 def vantage(boss, slot, dist=20.0):
     """An eye position from which the part is the first thing a ray towards it hits."""
-    import collide
     for elevation in (0.0, 35.0):
         for k in range(8):
             a, e = math.radians(45 * k), math.radians(elevation)
             c = next(c for c in boss.colliders() if c.slot == slot).centre()
             eye = (c[0] + dist * math.cos(e) * math.sin(a), c[1] + dist * math.sin(e), c[2] + dist * math.cos(e) * math.cos(a))
             d = tuple((q - p) / dist for p, q in zip(eye, c))
-            hit = collide.ray_cast(eye, d, boss.colliders(), dist + 2)
+            hit = boss.ray_cast(eye, d, dist + 2)
             if hit and hit.collider.slot == slot:
                 return eye
     raise AssertionError(f"part {slot} is not visible from anywhere")
@@ -28,7 +27,7 @@ def vantage(boss, slot, dist=20.0):
 def make_boss(seed=1):
     scene = world.make_scene(1)
     scene.slot_variants = pick_parts(random.Random(seed))
-    return scene, Boss(scene)
+    return scene, Boss(scene, W)
 
 
 def test_stands_still_until_it_attacks():
@@ -67,8 +66,7 @@ def test_hit_event_hurts_only_in_range_and_not_while_hooked():
     for pc, expect in ((near, True), (far, False)):
         boss.state, boss.attack = STRIKING, "sweep"
         boss.play("sweep")
-        bones, _ = boss.poses()
-        head = rig.transform(bones[boss.rig["bones"].index(next(b for b in boss.rig["bones"] if b["name"] == "head"))], (0, 0, 0))
+        head = boss.bone_position("head")
         pc.x, pc.z = head[0], head[2]
         pc.y = head[1] - 0.9 if expect else pc.y
         boss._events(0, 255, pc)
@@ -130,11 +128,11 @@ def test_aim_assist_snaps_to_a_visible_part():
     yaw = math.atan2(centre[0] - eye[0], centre[2] - eye[2]) + math.radians(2)
     pitch = math.atan2(centre[1] - eye[1], math.hypot(centre[0] - eye[0], centre[2] - eye[2]))
     view = g3d.Camera(*eye, yaw=yaw, pitch=pitch, fov=camera.FOV)
-    result = aim.compute(view, boss.colliders())
+    result = aim.compute(view, boss)
     assert result.flags & aim.FLAG_PART and result.target.slot == slot
     assert abs(result.dx) > 3  # the reticle moved off centre towards the part
     far = g3d.Camera(*eye, yaw=yaw + math.radians(20), pitch=pitch, fov=camera.FOV)
-    assert aim.compute(far, boss.colliders()).flags == 0
+    assert aim.compute(far, boss).flags == 0
 
 
 def test_shooting_a_part_until_it_breaks():
@@ -153,7 +151,7 @@ def test_shooting_a_part_until_it_breaks():
         shot = aim.Aim(eye, d, flags=aim.FLAG_PART, target=c)
         pc.cooldown = 0
         before = boss.hp[slot]
-        pc._shoot(shot, boss.colliders())
+        pc._shoot(shot, boss)
         for _ in range(10):
             pc._advance(0.05, boss)
         hits += before - boss.hp[slot]
@@ -171,10 +169,10 @@ def test_feet_block_the_pc_but_the_belly_does_not():
     for _ in range(40):  # walk straight at the foot
         view = g3d.Camera(pc.x, 2, pc.z - 6, yaw=0.0)
         pc.update(Input(move_y=1.0), camera.ThirdPersonCamera(0.0), 0.05, boss,
-                  aim.Aim((0, 0, 0), (0, 0, 1)), [])
+                  aim.Aim((0, 0, 0), (0, 0, 1)))
         assert math.hypot(pc.x - fx, pc.z - fz) >= r - 1e-6
     pc = Player(scene, x=0.0, z=0.0)  # right under the torso
-    pc.update(Input(), camera.ThirdPersonCamera(0.0), 0.05, boss, aim.Aim((0, 0, 0), (0, 0, 1)), [])
+    pc.update(Input(), camera.ThirdPersonCamera(0.0), 0.05, boss, aim.Aim((0, 0, 0), (0, 0, 1)))
     assert (pc.x, pc.z) == (0.0, 0.0)
 
 

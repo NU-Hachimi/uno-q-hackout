@@ -1,94 +1,48 @@
-"""Ray and circle queries against the boss's sphere and capsule colliders (api.md §5.1)."""
+"""Megalith's collision categories on alia-engine's colliders (its docs/api.md §1.6).
+
+The engine holds the shapes and answers the rays (boss.py asks it); this module only says what they mean
+to the game. The boss's rig carries its colliders in gen/rigs.apak, where tools/rig_build.py turns them
+into layers: every bone collider is BODY (user = its bone; HOOKABLE too if the JSON says so), every part
+slot's is PART (user = the slot; on while the part is fitted and unbroken, and it wins ties, so armour on
+a leg beats the leg). The two hook points boss.py adds are HOOK (user = the bone they sit on)."""
 
 import math
 from dataclasses import dataclass
 
-import rig
+BODY, PART, HOOK, HOOKABLE = 1, 2, 4, 8
+SOLID = BODY | PART  # what shots and sight lines stop at
 
 
-def _sub(a, b):
-    return a[0] - b[0], a[1] - b[1], a[2] - b[2]
-
-
-def _dot(a, b):
-    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-
-
-def _along(o, d, t):
-    return o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t
-
-
-def ray_sphere(o, d, c, r):
-    """Distance along unit ray (o, d) to the sphere, or None. A ray starting inside returns None."""
-    oc = _sub(o, c)
-    b = _dot(oc, d)
-    h = b * b - (_dot(oc, oc) - r * r)
-    if h < 0:
-        return None
-    t = -b - math.sqrt(h)
-    return t if t >= 0 else None
-
-
-def ray_capsule(o, d, a, b, r):
-    """Distance along unit ray (o, d) to the capsule a-b of radius r, or None."""
-    ba, oa = _sub(b, a), _sub(o, a)
-    baba, bard, baoa = _dot(ba, ba), _dot(ba, d), _dot(ba, oa)
-    rdoa, oaoa = _dot(d, oa), _dot(oa, oa)
-    k2 = baba - bard * bard
-    if k2 > 1e-9:  # not parallel to the axis: try the cylinder wall first
-        k1 = baba * rdoa - baoa * bard
-        k0 = baba * oaoa - baoa * baoa - r * r * baba
-        h = k1 * k1 - k2 * k0
-        if h < 0:
-            return None
-        t = (-k1 - math.sqrt(h)) / k2
-        y = baoa + t * bard
-        if 0 < y < baba:
-            return t if t >= 0 else None
-        end = a if y <= 0 else b
-    else:
-        end = a if baoa + bard < 0 else b
-    return ray_sphere(o, d, end, r)
-
-
-@dataclass
+@dataclass(eq=False)
 class Collider:
-    kind: str            # "body" or "part"
+    kind: str            # "body", "part" or "hook"
     shape: str           # "sphere" or "capsule"
-    a: tuple             # sphere centre, or capsule end
+    a: tuple             # sphere centre, or capsule end (world space, this step)
     b: tuple             # capsule other end (== a for spheres)
     r: float
     bone: int            # bone index the collider moves with
     slot: int = -1       # rig slot for parts
     hookable: bool = False
+    node: object = None  # the engine node carrying it: the collider's identity
+
+    @staticmethod
+    def of(c, rig_data):
+        """The game's view of an alia_engine.WorldCollider of the boss's rig."""
+        if c.layers & PART:
+            kind, bone, slot = "part", rig_data["slots"][c.user]["bone_index"], c.user
+        else:
+            kind, bone, slot = "hook" if c.layers & HOOK else "body", c.user, -1
+        shape = c.shape.name.lower()  # alia_engine.Shape: "sphere" or "capsule"
+        return Collider(kind, shape, c.a, c.b, c.r, bone, slot, bool(c.layers & (HOOK | HOOKABLE)), c.node)
 
     def centre(self):
         return tuple((x + y) / 2 for x, y in zip(self.a, self.b))
 
-    def ray(self, o, d):
-        return ray_sphere(o, d, self.a, self.r) if self.shape == "sphere" else ray_capsule(o, d, self.a, self.b, self.r)
+    def __eq__(self, other):
+        return isinstance(other, Collider) and self.node == other.node
 
-
-def boss_colliders(rig_data, poses, slot_poses, alive, variants):
-    """World colliders: every bone collider (kind "body"), then each fitted, alive part ("part").
-    `poses` are world bone transforms; `slot_poses[i]` the world transform of slot i."""
-    out = []
-    for index, bone in enumerate(rig_data["bones"]):
-        m = poses[index]
-        for c in bone.get("colliders", []):
-            if c["type"] == "sphere":
-                p = rig.transform(m, c["c"])
-                out.append(Collider("body", "sphere", p, p, c["r"], index, hookable=c.get("hookable", False)))
-            else:
-                out.append(Collider("body", "capsule", rig.transform(m, c["a"]), rig.transform(m, c["b"]), c["r"],
-                                    index, hookable=c.get("hookable", False)))
-    for slot_index, slot in enumerate(rig_data["slots"]):
-        if not variants[slot_index] or not alive & (1 << slot_index):
-            continue
-        c = slot["collider"]
-        p = rig.transform(slot_poses[slot_index], c["c"])
-        out.append(Collider("part", "sphere", p, p, c["r"], slot["bone_index"], slot_index))
-    return out
+    def __hash__(self):
+        return hash(self.node)
 
 
 @dataclass
@@ -96,21 +50,6 @@ class Hit:
     t: float
     point: tuple
     collider: Collider
-
-
-def ray_cast(o, d, colliders, max_dist, accept=lambda c: True):
-    """Nearest collider hit within max_dist that `accept` allows, or None.
-    Parts are tested before body shapes at equal distance, so armour on a leg wins over the leg."""
-    best = None
-    for c in colliders:
-        if not accept(c):
-            continue
-        t = c.ray(o, d)
-        if t is None or t > max_dist:
-            continue
-        if best is None or t < best.t - 1e-6 or (abs(t - best.t) <= 1e-6 and c.kind == "part"):
-            best = Hit(t, _along(o, d, t), c)
-    return best
 
 
 def push_out(x, z, cx, cz, r):

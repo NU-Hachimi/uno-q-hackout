@@ -131,6 +131,13 @@ def terrain_height(scene, x, z):
     return (top + (bottom - top) * fz) * scene.height_scale / 16
 
 
+def set_ground(w, scene):
+    """The terrain as alia-engine's ground (heights in m, the same bilinear surface as terrain_height):
+    shots stop on it (World.ray_ground)."""
+    k = scene.height_scale / 16
+    w.set_ground([h * k for h in scene.heights], scene.terrain_n, scene.cell, (scene.origin_x, scene.origin_z))
+
+
 def extent(scene, margin=0.0):
     """(min, max) of the playable square along both axes."""
     lo = scene.origin_x + margin

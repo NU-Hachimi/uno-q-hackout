@@ -21,7 +21,7 @@ ENGINE_OPTS = -DALIA_BUILD_TESTS=OFF -DALIA_BUILD_APPS=OFF
 help:
 	@printf '%s\n' \
 	  'make run           Play on the PC (window; keyboard or gamepad)' \
-	  'make test          Python tests' \
+	  'make test          Python tests (in a headless alia-engine built for the PC)' \
 	  'make gen           Regenerate python/gen and sketch/gen from assets/' \
 	  'make cart          Board cart: build/cart/ and build/megalith.acart' \
 	  'make cart-pc       The same cart for the PC (simulator): build/cart-pc/' \
@@ -48,8 +48,9 @@ engine-board: $(ENGINE_BOARD)/build.ninja
 run: engine-pc
 	cd python && PYTHONPATH="$(CURDIR)/$(ENGINE_PC)" "$(PYTHON)" main.py
 
-test:
-	"$(PYTHON)" -m pytest -q tests
+test: $(ENGINE_PC)/build.ninja
+	cmake --build $(ENGINE_PC) --target alia_engine
+	PYTHONPATH="$(CURDIR)/$(ENGINE_PC)" "$(PYTHON)" -m pytest -q tests
 
 gen:
 	ALIA_ENGINE="$(ALIA_ENGINE)" "$(PYTHON)" tools/mesh_build.py

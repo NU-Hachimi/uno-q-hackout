@@ -49,58 +49,60 @@ def _towards(origin, point):
     return tuple(x / dist for x in v), dist
 
 
-def _visible(origin, target, colliders):
+def _visible(origin, target, boss):
     d, dist = _towards(origin, target.centre())
-    hit = collide.ray_cast(origin, d, colliders, dist + target.r)
-    return hit is not None and hit.collider is target
+    hit = boss.ray_cast(origin, d, dist + target.r)
+    return hit is not None and hit.collider == target
 
 
-def _snap(origin, f, colliders, wants):
+def _snap(origin, f, boss, wants):
     """The wanted, visible collider closest to the screen centre within ASSIST_DEG, or None."""
     best, best_angle = None, math.radians(ASSIST_DEG)
-    for c in colliders:
+    for c in boss.colliders():
         if not wants(c):
             continue
         d, dist = _towards(origin, c.centre())
         if dist < 1e-6:
             continue
         angle = math.acos(max(-1.0, min(1.0, sum(a * b for a, b in zip(d, f)))))
-        if angle < best_angle and _visible(origin, c, colliders):
+        if angle < best_angle and _visible(origin, c, boss):
             best, best_angle = c, angle
     return best
 
 
-def _hook_clear(origin, hook, colliders):
+def _hook_clear(origin, hook, boss):
     """Nothing stands between the camera and the hook point but the bone it sits on (the brow sits among
     the skull, snout and antlers; the hump on the torso) and the boss's surface right around it."""
     d, dist = _towards(origin, hook.centre())
-    hit = collide.ray_cast(origin, d, colliders, dist, lambda c: c.bone != hook.bone)
+    hit = boss.ray_cast(origin, d, dist, exclude_bone=hook.bone)
     return hit is None or hit.t >= dist - HOOK_SURFACE
 
 
-def compute(view, colliders, hand=None, hooks=()):
-    """Where the reticle sits this frame, where a shot would go, and where the hook would catch.
-    `hooks` are the boss's hook points (Boss.hook_targets()); the hook catches nowhere else."""
+def compute(view, boss, hand=None):
+    """Where the reticle sits this frame, where a shot would go, and where the hook would catch (on the
+    boss's hook points, Boss.hook_targets(), only; `hand` is where the hook leaves from, None: no hook)."""
     origin = (view.x, view.y, view.z)
     f, _, _ = basis(view)
     aim = Aim(origin, f)
 
-    part = _snap(origin, f, colliders, lambda c: c.kind == "part")
+    part = _snap(origin, f, boss, lambda c: c.kind == "part")
     if part is not None:
         aim.direction, _ = _towards(origin, part.centre())
         aim.target, aim.flags = part, FLAG_PART
     else:
-        hit = collide.ray_cast(origin, f, colliders, 200.0)
+        hit = boss.ray_cast(origin, f, 200.0)
         if hit is not None and hit.collider.kind == "part":
             aim.target, aim.flags = hit.collider, FLAG_PART
 
     best = math.radians(HOOK_ASSIST_DEG)
-    for hook in hooks if hand is not None else ():
+    hooks = boss.hook_targets() if hand is not None else ()
+    under = boss.ray_cast(origin, f, 1000.0, layers=collide.HOOK) if hooks else None  # the hook point the reticle is on
+    for hook in hooks:
         d, dist = _towards(origin, hook.centre())
         angle = math.acos(max(-1.0, min(1.0, sum(a * b for a, b in zip(d, f)))))
-        if hook.ray(origin, f) is not None:
-            angle = 0.0  # the reticle is on it
-        if angle <= best and math.dist(hand, hook.centre()) <= HOOK_RANGE and _hook_clear(origin, hook, colliders):
+        if under is not None and under.collider == hook:
+            angle = 0.0
+        if angle <= best and math.dist(hand, hook.centre()) <= HOOK_RANGE and _hook_clear(origin, hook, boss):
             best, aim.hook = angle, collide.Hit(dist, hook.centre(), hook)
     if aim.hook is not None:
         aim.flags |= FLAG_HOOK

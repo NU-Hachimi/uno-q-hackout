@@ -16,6 +16,7 @@ from pathlib import Path
 
 import alia_engine as ae
 
+import assets
 import g3d
 import world
 from gen import mesh_ids
@@ -23,7 +24,6 @@ from gen import palette as pal
 from gen.rigs import RIGS
 
 MESH_PACK = Path(__file__).resolve().parent / "gen" / "meshes.apak"  # alia-engine resource pack (tools/mesh_build.py)
-RIG_PACK = Path(__file__).resolve().parent / "gen" / "rigs.apak"     # its rigs (tools/rig_build.py)
 _LOOK = struct.Struct("<32HBBBbBHHBBB")
 
 # Lights and materials (sketch/render.cpp).
@@ -120,8 +120,8 @@ class View:
         # rebuilt when the sky changes, the node stays) and the scattered rocks. Moving things are still
         # drawn per frame until the rigs move into the engine too (E4 step 4).
         engine.world.spawn(self.terrain)
-        self.rigs = engine.load_rigs(str(RIG_PACK))  # by name; the Frame names rigs by id (gen.rigs)
-        self.rig_nodes = {}  # block index -> [rig id, RigNode, hidden, fade, char_light, slot state]
+        self.rigs = assets.load(engine)  # by name; the Frame names rigs by id (gen.rigs)
+        self.rig_nodes = {}  # block index -> [rig id, RigNode, hidden, fade, char_light]
         self.pool = {}       # mesh id -> nodes for this kind of object
         self.rope_node = None
         for x, z, yaw, scale, mesh_id, tint in scene.rocks:
@@ -205,7 +205,7 @@ class View:
         f.overlay = rgba(pal.PALETTE_565[pal.HURT], HURT_ALPHA) if frame.flags & g3d.FLAG_HURT else 0
 
         hand = None
-        for k, block in enumerate(frame.rigs):
+        for k, block in enumerate(frame.rigs[1:], 1):  # the boss is its own rig (boss.py), not the Frame's
             hand = self._rig(k, block) or hand
         self._objects(frame.objects)
         self._rope(frame.hook, hand, cam)
@@ -216,7 +216,7 @@ class View:
             self._hud(frame.hud)
 
     def _rig(self, k, block):
-        """Rig block k (0 boss, 1 horse, 2 rider) as an engine rig; returns the rider's hand position, if any."""
+        """Rig block k (1 horse, 2 rider) as an engine rig; returns the rider's hand position, if any."""
         state = self.rig_nodes.get(k)
         if block is None or block.rig_id not in RIGS or block.fade >= 1:
             if state and not state[2]:
@@ -227,7 +227,7 @@ class View:
             if state:
                 state[1].destroy()
             node = self.e.world.spawn_rig(self.rigs[RIGS[block.rig_id]["name"]])
-            state = self.rig_nodes[k] = [block.rig_id, node, True, None, None, {}]
+            state = self.rig_nodes[k] = [block.rig_id, node, True, None, None]
         node = state[1]
         node.position, node.yaw = (block.x, block.y, block.z), block.yaw
         node.animator.anim, node.animator.phase = block.anim, block.phase
@@ -236,23 +236,9 @@ class View:
             node.set_subtree(visible=True)
             node.teleport()
             state[2] = False
-            state[5].clear()  # the parts' visibility below starts over
         if state[3] != block.fade or state[4] != light:
             node.set_subtree(fade=block.fade, light=light)  # not visible: dead parts stay hidden
             state[3], state[4] = block.fade, light
-        if k == 0:  # the boss: the parts fitted this round, alive, the one just hit flashing
-            r = RIGS[block.rig_id]
-            for s in range(min(len(r["slots"]), 32)):
-                variant = self.scene.slot_variants[s] if s < len(self.scene.slot_variants) else 0
-                want = (variant, bool(block.part_alive & (1 << s)), block.hit_slot == s)
-                if state[5].get(s) == want:
-                    continue
-                slot = node.slot(s)
-                if state[5].get(s, (None,))[0] != variant:
-                    node.slot_variant(s, variant if variant < len(r["slots"][s]["variants"]) else 0)
-                slot.visible = want[1]
-                slot.tint, slot.ground_fog = (pal.FLASH, False) if want[2] else (0, True)
-                state[5][s] = want
         if "hand" in RIGS[block.rig_id].get("attach", {}):
             return node.attach_point("hand").world_position
         return None

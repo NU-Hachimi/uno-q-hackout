@@ -9,14 +9,19 @@ with C in the window, or be thrown off and hurt.
 Breaking both leg parts makes it kneel for a while, then rise; after that every few points of damage
 bring it down again. Breaking the legs and the back shatters the head cover and exposes the weak
 point, which falls to the finisher (finisher.py).
+
+It is a rig in alia-engine's world (`self.node`): the boss moves and poses it every step, and its
+colliders, bones and attach points are read back from the engine (collide.py says what they mean).
 """
 
 import math
 import random
 
+import alia_engine as ae
+
+import assets
 import collide
 import g3d
-import rig
 import world
 from gen import mesh_ids, palette
 from gen.rigs import RIGS
@@ -92,8 +97,10 @@ def _wrap(angle):
 
 
 class Boss:
-    def __init__(self, scene, rng=None):
+    def __init__(self, scene, w, rng=None):
+        """`w`: the alia_engine.World the boss lives in (assets.load() first)."""
         self.scene = scene
+        self.w = w
         self.rng = rng or random.Random()
         self.rig = RIGS[scene.rig_id]
         self.anims = anim_ids(self.rig)
@@ -125,6 +132,33 @@ class Boss:
         self.waves = []    # spreading shockwaves: [x, y, z, radius, speed, damage]
         self.fade = 0.0    # 0..1 extra blend into the fog (1 = not drawn), for the intro and the finisher
         self._cache = None
+        self._spawn()
+
+    def _spawn(self):
+        """The rig with this round's parts, and a HOOK sphere at each hook point (a node on its bone)."""
+        self.node = node = self.w.spawn_rig(assets.RIGS[self.rig["name"]], position=(self.x, self.y, self.z),
+                                            yaw=self.yaw)
+        for slot, variant in enumerate(self.variants):
+            if variant:
+                node.slot_variant(slot, variant)
+        names = [b["name"] for b in self.rig["bones"]]
+        self.hooks = []
+        for name, point in HOOK_POINTS:
+            bone = names.index(name)
+            hook = self.w.spawn(name="hook_" + name, parent=node.bone(bone), position=point)
+            hook.collider = ae.sphere((0, 0, 0), HOOK_RADIUS, layers=collide.HOOK, user=bone)
+            self.hooks.append(hook)
+        # Every collider node in the rig's order (bones, then slots), so colliders() lists them like the JSON.
+        order = [c for i in range(len(names)) for c in node.colliders(i)]
+        order += [node.slot(i) for i in range(len(self.rig["slots"]))]
+        self.rank = {n: k for k, n in enumerate(order)}
+        self.shins = {c for i, n in enumerate(names) if n.startswith("shin") for c in node.colliders(i)}
+        self._shown = {"hidden": False, "fade": 0.0}  # what present() last gave the node
+
+    def close(self):
+        """Take the rig out of the world (a new round spawns a new boss)."""
+        if self.node.alive:
+            self.node.destroy()
 
     # ---- animation -----------------------------------------------------------------------
     def play(self, name):
@@ -241,13 +275,11 @@ class Boss:
                 continue
             kind = event["type"]
             if kind == "hit" and player.mounted:
-                bones, _ = self.poses()
-                p = rig.transform(bones[event["bone_index"]], (0, 0, 0))
+                p = self.bone_position(event["bone_index"])
                 if math.dist(p, (player.x, player.y + PC_CENTRE, player.z)) <= event["r"]:
                     player.hurt(event.get("dmg", 1))
             elif kind == "shockwave":
-                bones, _ = self.poses()
-                x, _, z = rig.transform(bones[event["bone_index"]], (0, 0, 0))
+                x, _, z = self.bone_position(event["bone_index"])
                 self.waves.append([x, world.terrain_height(self.scene, x, z), z, 0.0, event["speed"],
                                    event.get("dmg", 1)])
             elif kind == "throw" and player.on_boss:
@@ -276,42 +308,84 @@ class Boss:
         return self.state == SHAKING and player.hooked and self.phase() < THROW_PHASE
 
     # ---- geometry ---------------------------------------------------------------------------
-    def poses(self):
-        """(bone world transforms, slot world transforms) this frame, cached until update()."""
-        if self._cache is None:
-            bones = rig.world_poses(self.rig, self.anim, self.phase(), self.x, self.y, self.z, self.yaw)
-            slots = [rig.slot_matrix(self.rig, bones, i) for i in range(len(self.rig["slots"]))]
-            self._cache = bones, slots
-        return self._cache
+    def _place(self):
+        """The rig follows the logic (position, heading, pose) before anything is read from it."""
+        node = self.node
+        node.position, node.yaw = (self.x, self.y, self.z), self.yaw
+        node.animator.anim, node.animator.phase = self.anim, self.phase()
+        return node
+
+    def bone_position(self, bone):
+        """World position of a bone's origin (name or index), this step."""
+        return self._place().bone(bone).world_position
+
+    def attach_position(self, name):
+        return self._place().attach_point(name).world_position
+
+    def position_of(self, node):
+        """World position of one of the rig's nodes (a hook point, a slot), this step."""
+        self._place()
+        return node.world_position
 
     def colliders(self):
-        bones, slots = self.poses()
-        return collide.boss_colliders(self.rig, bones, slots, self.alive, self.variants)
+        """The BODY and PART colliders this step (collide.Collider, in the rig's order), cached until update()."""
+        if self._cache is None:
+            self._place()
+            mine = [c for c in self.w.colliders(collide.SOLID) if c.node in self.rank]
+            mine.sort(key=lambda c: self.rank[c.node])
+            self._cache = [collide.Collider.of(c, self.rig) for c in mine]
+        return self._cache
 
     def hook_targets(self):
         """The only places the hook catches, the back and the brow, as spheres around each point
         (the rig's hookable flags are not used)."""
-        bones, _ = self.poses()
-        names = [b["name"] for b in self.rig["bones"]]
-        out = []
-        for name, point in HOOK_POINTS:
-            bone = names.index(name)
-            p = rig.transform(bones[bone], point)
-            out.append(collide.Collider("hook", "sphere", p, p, HOOK_RADIUS, bone, hookable=True))
-        return out
+        self._place()
+        by_node = {c.node: c for c in self.w.colliders(collide.HOOK)}
+        return [collide.Collider.of(by_node[h], self.rig) for h in self.hooks]
+
+    def ray_cast(self, o, d, max_dist, layers=collide.SOLID, exclude_bone=-1):
+        """The nearest of the boss's colliders on the unit ray (o, d) within max_dist (collide.Hit), or None.
+        `exclude_bone`: nothing on that bone counts (its own shapes and the parts on it)."""
+        colliders = self.colliders() + (self.hook_targets() if layers & collide.HOOK else [])
+        skip = [c.node for c in colliders if c.bone == exclude_bone]
+        hit = self.w.ray_cast(o, d, max_dist, layers, skip)
+        c = next((c for c in colliders if hit is not None and c.node == hit.node), None)
+        return collide.Hit(hit.distance, hit.point, c) if c is not None else None
 
     def feet(self):
         """Ground circles (x, z, r) the PC cannot enter: the lower ends of the shins."""
-        bones, _ = self.poses()
         out = []
-        for index, bone in enumerate(self.rig["bones"]):
-            if not bone["name"].startswith("shin"):
-                continue
-            for c in bone.get("colliders", []):
-                ends = [rig.transform(bones[index], c["a"]), rig.transform(bones[index], c["b"])]
-                foot = min(ends, key=lambda p: p[1])
-                out.append((foot[0], foot[2], c["r"] + FOOT_CLEARANCE))
+        for c in self.colliders():
+            if c.node in self.shins:
+                foot = min((c.a, c.b), key=lambda p: p[1])
+                out.append((foot[0], foot[2], c.r + FOOT_CLEARANCE))
         return out
+
+    def present(self):
+        """Once a step, what the rig shows: hidden while faded out, the broken parts gone, the part just hit
+        flashing."""
+        node, shown = self._place(), self._shown
+        hidden = self.fade >= 1
+        if hidden != shown["hidden"]:
+            node.set_subtree(visible=not hidden)
+            if not hidden:  # back: no slide from where it was hidden, and the parts below start over
+                node.teleport()
+                shown.clear()
+            shown["hidden"] = hidden
+        if hidden:
+            return
+        if shown.get("fade") != self.fade:
+            node.set_subtree(fade=self.fade)  # not visible: broken parts stay hidden
+            shown["fade"] = self.fade
+        flash = self.hit_slot if self.hit_timer > 0 else -1
+        for slot, variant in enumerate(self.variants):
+            want = (bool(self.alive & (1 << slot)), slot == flash)
+            if not variant or shown.get(slot) == want:
+                continue
+            part = node.slot(slot)
+            part.visible = want[0]
+            part.tint, part.ground_fog = (palette.FLASH, False) if want[1] else (0, True)
+            shown[slot] = want
 
     # ---- damage -------------------------------------------------------------------------------
     def damageable(self, slot, hooked=False):
@@ -347,9 +421,11 @@ class Boss:
 
     def _break(self, slot):
         self.alive &= ~(1 << slot)
-        _, slots = self.poses()
+        part = self.node.slot(slot)
+        part.collider_enabled = False
+        self._cache = None
         mesh = self.rig["slots"][slot]["variants"][self.variants[slot]] or ""
-        self.broken.append((slot, rig.transform(slots[slot], (0, 0, 0)), part_tint(mesh)))
+        self.broken.append((slot, self.position_of(part), part_tint(mesh)))
 
     def begin_execution(self):
         """The finisher starts: stop attacking and drop pending shockwaves."""
