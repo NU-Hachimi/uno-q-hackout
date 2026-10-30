@@ -18,6 +18,7 @@ import math
 import random
 
 import alia_engine as ae
+import alia_kit as kit
 
 import assets
 import collide
@@ -91,10 +92,6 @@ def part_tint(mesh_name):
     if mesh_name.startswith(("crystal", "sigil")):
         return palette.SIGIL
     return palette.STONE_MID
-
-
-def _wrap(angle):
-    return (angle + math.pi) % (2 * math.pi) - math.pi
 
 
 class Boss:
@@ -247,9 +244,9 @@ class Boss:
 
     def _turn(self, player, dt):
         """Turn towards the PC at TURN_RATE; returns the angle still to go."""
-        diff = _wrap(math.atan2(player.x - self.x, player.z - self.z) - self.yaw)  # the rig's front is +Z
+        diff = kit.angle_between(self.yaw, kit.yaw_to((self.x, self.z), (player.x, player.z)))  # the rig's front is +Z
         step = TURN_RATE * dt
-        self.yaw = _wrap(self.yaw + max(-step, min(step, diff)))
+        self.yaw = kit.wrap_angle(self.yaw + kit.clamp(diff, -step, step))
         return diff
 
     def _run(self, dt, player):

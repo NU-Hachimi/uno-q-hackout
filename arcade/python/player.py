@@ -16,6 +16,7 @@ import random
 from dataclasses import dataclass
 
 import alia_engine as ae
+import alia_kit as kit
 
 import assets
 import camera
@@ -79,10 +80,6 @@ class Tracer:
     damage: int = 1
     hooked: bool = False
     tint: int = 0        # spark colour on arrival
-
-
-def _wrap(angle):
-    return (angle + math.pi) % (2 * math.pi) - math.pi
 
 
 class Player:
@@ -241,11 +238,11 @@ class Player:
         """The rope: the thin box (assets.ROPE, 2 m along +Z) from the hand to the hook head."""
         hand = self.hand() if shown else None
         d = tuple(b - a for a, b in zip(hand, self.hook_head)) if shown else (0.0, 0.0, 0.0)
-        length = math.sqrt(sum(c * c for c in d))
+        length = kit.length(d)
         self.rope.active = shown and length > 1e-3
         if self.rope.active:
-            self.rope.position = tuple((a + b) / 2 for a, b in zip(hand, self.hook_head))
-            self.rope.set_rotation(math.atan2(d[0], d[2]), -math.atan2(d[1], math.hypot(d[0], d[2])), 0.0)
+            self.rope.position = kit.lerp3(hand, self.hook_head, 0.5)
+            self.rope.set_rotation(*kit.aim(d), 0.0)
             self.rope.scale = (1.0, 1.0, length / 2)
             self.rope.teleport()  # it follows the hand and the hook, which jump about
 
@@ -280,7 +277,7 @@ class Player:
     def _walk(self, inp, cam, dt, boss):
         """Ride: stick x steers (the camera follows through self.steer), stick y is the throttle."""
         self.steer = -inp.move_x * math.radians(tuning.STEER_RATE_DEG) * dt  # turning right lowers yaw
-        self.yaw = _wrap(self.yaw + self.steer)
+        self.yaw = kit.wrap_angle(self.yaw + self.steer)
         self.speed = inp.move_y if inp.move_y >= 0 else inp.move_y * tuning.REVERSE_FRACTION
         if abs(self.speed) > 1e-3:
             f = camera.forward(self.yaw)
@@ -328,7 +325,7 @@ class Player:
         if aim.hook is not None:
             self.hook_anchor = aim.hook.collider.node  # rides the bone, so the hook lands on the brow wherever it moved
             self.hook_to = aim.hook.point
-            self.yaw = math.atan2(self.hook_to[0] - self.x, self.hook_to[2] - self.z)
+            self.yaw = kit.yaw_to((self.x, self.z), self.hook_to)
         else:
             self.hook_anchor = None
             d = aim.direction
@@ -483,10 +480,9 @@ class Player:
         objs = []
         if self.hook in (FLYING, RETURNING):
             d = tuple(b - a for a, b in zip(self.hook_from, self.hook_to))
-            objs.append(screen.Obj(mesh_ids.HOOK_HEAD, *self.hook_head, yaw=math.atan2(d[0], d[2]),
-                                pitch=-math.atan2(d[1], math.hypot(d[0], d[2])), scale=HOOK_SCALE))
+            yaw, pitch = kit.aim(d)
+            objs.append(screen.Obj(mesh_ids.HOOK_HEAD, *self.hook_head, yaw=yaw, pitch=pitch, scale=HOOK_SCALE))
         for t in self.tracers:
-            horizontal = math.hypot(t.vx, t.vz)
-            objs.append(screen.Obj(mesh_ids.BULLET, t.x, t.y, t.z, yaw=math.atan2(t.vx, t.vz),
-                                pitch=-math.atan2(t.vy, horizontal), scale=3.0))  # long streak: readable at 240x160
+            yaw, pitch = kit.aim((t.vx, t.vy, t.vz))
+            objs.append(screen.Obj(mesh_ids.BULLET, t.x, t.y, t.z, yaw=yaw, pitch=pitch, scale=3.0))  # long streak: readable at 240x160
         return objs

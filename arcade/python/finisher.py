@@ -12,6 +12,8 @@ The boss has no `die` animation yet, so it holds its pose (or kneels) and sinks 
 
 import math
 
+import alia_kit as kit
+
 import aim
 import assets
 from shown import Shown
@@ -173,4 +175,5 @@ class Finisher:
         x, z = target[0] + math.sin(heading) * flat, target[2] + math.cos(heading) * flat
         y = max(target[1] + dist * math.sin(CAMERA_ELEVATION), terrain.terrain_height(boss.scene, x, z) + 1.0)
         dx, dy, dz = target[0] - x, target[1] - y, target[2] - z
-        return screen.Camera(x, y, z, yaw=math.atan2(dx, dz), pitch=math.atan2(dy, math.hypot(dx, dz)))
+        yaw, pitch = kit.aim((dx, dy, dz), camera=True)
+        return screen.Camera(x, y, z, yaw=yaw, pitch=pitch)

@@ -7,6 +7,8 @@ player has control. A during the intro skips to the end of it."""
 import math
 import random
 
+import alia_kit as kit
+
 import aim as aiming
 import screen
 import terrain
@@ -162,17 +164,17 @@ class Game:
     def _ride_to(self, x, z, throttle, dt, steer=True):
         """Ride the PC towards (x, z) with a made-up stick (no buttons), the camera behind it."""
         p = self.player
-        turn = (math.atan2(x - p.x, z - p.z) - p.yaw + math.pi) % (2 * math.pi) - math.pi if steer else 0.0
+        turn = kit.angle_between(p.yaw, kit.yaw_to((p.x, p.z), (x, z))) if steer else 0.0
         self.camera.turn(Input(), dt)
         # turning right lowers yaw, so a positive turn needs the stick to the left
-        p.update(Input(move_x=max(-1.0, min(1.0, -2.0 * turn)), move_y=throttle), self.camera, dt, self.boss, None)
+        p.update(Input(move_x=kit.clamp(-2.0 * turn, -1.0, 1.0), move_y=throttle), self.camera, dt, self.boss, None)
         self.camera.follow(p, dt)
 
     def _fight_begins(self):
         p = self.player
         p.x, p.z = FIGHT_SPAWN
         p.y = terrain.terrain_height(self.scene, p.x, p.z)
-        p.yaw = math.atan2(self.boss.x - p.x, self.boss.z - p.z)
+        p.yaw = kit.yaw_to((p.x, p.z), (self.boss.x, self.boss.z))
         p.boost, p.speed, p.standing = 1.0, 0.0, True
         self.boss.fade = 0.0
         self.camera = ThirdPersonCamera(p.yaw)
