@@ -11,7 +11,8 @@ from cart.toml, the window from the compositor, and the common flags (--headless
 The engine module comes from ./python next to this file (a cart's content/python, from
 `make cart`) or from PYTHONPATH during development (an alia-engine build directory).
 Controls (Alia Pad labels): left stick rides, right stick looks, B shoots, X or R1 fires and
-releases the hook, A opens the menu and confirms, L3 is the stick press.
+releases the hook, Start opens and closes the pause menu, A confirms in it (and A or Start starts a round),
+L3 is the stick press.
 """
 
 import argparse
@@ -31,7 +32,7 @@ from game import Game  # noqa: E402
 
 # Alia Pad buttons are positional; the labels are Nintendo-style (A = East, B = South, X = North).
 BUTTONS = ((ae.EAST, g3d.BTN_A), (ae.SOUTH, g3d.BTN_B), (ae.NORTH, g3d.BTN_C), (ae.R1, g3d.BTN_C),
-           (ae.L3, g3d.BTN_STICK))
+           (ae.L3, g3d.BTN_STICK), (ae.START, g3d.BTN_START))
 
 
 def _bits(state):

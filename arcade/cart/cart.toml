@@ -9,7 +9,7 @@ version     = "1.1.0"
 publisher   = "NU Hachimi"
 description = """A low-poly boss fight in the spirit of Shadow of the Colossus. Ride around a giant \
 stone moose, shoot off its leg armor and back crystals, grapple onto its back or brow, and finish it.
-Left stick rides, right stick looks, B shoots, X fires the hook, A opens the menu."""
+Left stick rides, right stick looks, B shoots, X fires the hook, Start pauses."""
 
 [runtime]
 type  = "python"

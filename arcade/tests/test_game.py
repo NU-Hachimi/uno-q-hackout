@@ -107,7 +107,7 @@ def test_menu_navigation_and_restart():
     game = started()
     for _ in range(10):
         game.step(raw(jy=120), DT)
-    game.step(raw(pressed=g3d.BTN_A), DT)
+    game.step(raw(pressed=g3d.BTN_START), DT)
     assert game.state == MENU
     hud = game.step(raw(jy=-120), DT).hud  # stick down -> Restart
     assert hud.state == g3d.STATE_PAUSED and hud.msg == 10
@@ -117,9 +117,21 @@ def test_menu_navigation_and_restart():
 
 def test_menu_continue_resumes():
     game = started()
-    game.step(raw(pressed=g3d.BTN_A), DT)
-    game.step(raw(pressed=g3d.BTN_A), DT)
+    game.step(raw(pressed=g3d.BTN_START), DT)
+    game.step(raw(pressed=g3d.BTN_A), DT)  # Continue
     assert game.state == FIGHT
+    game.step(raw(pressed=g3d.BTN_START), DT)
+    game.step(raw(pressed=g3d.BTN_START), DT)  # Start again closes it
+    assert game.state == FIGHT
+
+
+def test_a_does_not_pause_and_start_also_starts():
+    game = started()
+    game.step(raw(pressed=g3d.BTN_A), DT)
+    assert game.state == FIGHT  # A is not the menu key any more
+    fresh = Game(world.make_scene(1), W)
+    fresh.step(raw(pressed=g3d.BTN_START), DT)
+    assert fresh.state == INTRO
 
 
 def test_missing_controller_pauses_then_resumes_via_menu():

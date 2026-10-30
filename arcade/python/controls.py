@@ -5,7 +5,7 @@ import math
 from dataclasses import dataclass
 
 import tilt_config as tilt
-from g3d import BTN_A, BTN_B, BTN_C, BTN_STICK
+from g3d import BTN_A, BTN_B, BTN_C, BTN_START, BTN_STICK
 from preview import DEAD_ZONE, INVERT_X, INVERT_Y
 
 STICK_FULL = 120  # raw stick reading treated as full deflection
@@ -37,7 +37,7 @@ class Controls:
         if raw is None:
             return Input()
         inp = Input(connected=raw.connected)
-        buttons = (7 if raw.connected & 1 else 0) | (BTN_STICK if raw.connected & 2 else 0)
+        buttons = (BTN_A | BTN_B | BTN_C | BTN_START if raw.connected & 1 else 0) | (BTN_STICK if raw.connected & 2 else 0)
         inp.held, inp.pressed = raw.held & buttons, raw.pressed & buttons
 
         if raw.connected & 2:
@@ -55,4 +55,4 @@ class Controls:
         return inp
 
 
-__all__ = ["Controls", "Input", "BTN_A", "BTN_B", "BTN_C", "BTN_STICK"]
+__all__ = ["Controls", "Input", "BTN_A", "BTN_B", "BTN_C", "BTN_START", "BTN_STICK"]

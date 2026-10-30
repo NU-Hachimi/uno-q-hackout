@@ -23,7 +23,7 @@ STATE_READY, STATE_FIGHT, STATE_WIN, STATE_LOSE, STATE_PAUSED = range(5)
 
 # Input buttons: bits 0-3 are held now, bits 4-7 were pressed at least once since the last
 # reply (latched by the MCU so taps shorter than a frame are not lost).
-BTN_A, BTN_B, BTN_C, BTN_STICK = 1, 2, 4, 8
+BTN_A, BTN_B, BTN_C, BTN_STICK, BTN_START = 1, 2, 4, 8, 16  # START: Alia Pad only (no MCU button)
 
 FLAG_WIREFRAME, FLAG_NO_FOG, FLAG_NO_HUD, FLAG_HURT, FLAG_FREEZE, FLAG_NO_GRADE = (1 << i for i in range(6))
 

@@ -13,10 +13,11 @@ import g3d
 import world
 from boss import Boss, pick_parts
 from camera import ThirdPersonCamera
-from controls import BTN_A, BTN_B, Controls, Input
+from controls import BTN_A, BTN_B, BTN_START, Controls, Input
 from finisher import Finisher
 from player import HP_MAX, Player
 
+GO = BTN_A | BTN_START  # starts a round, skips the intro, restarts after it: either, like a title screen
 READY, INTRO, FIGHT, MENU, MISSING, WIN, LOSE, EXECUTE = (
     "ready", "intro", "fight", "menu", "missing", "win", "lose", "execute")
 
@@ -133,7 +134,7 @@ class Game:
             self._menu(inp, dt)
         elif self.state == EXECUTE:
             self._execute(dt)
-        elif self.state in (WIN, LOSE) and inp.pressed & BTN_A:
+        elif self.state in (WIN, LOSE) and inp.pressed & GO:
             self.restart()
         self.boss.present()
         self.player.present()
@@ -150,7 +151,7 @@ class Game:
         if (p.x - self.ready_to) * math.copysign(1, self.ready_to) > -5.0:
             self.ready_to = -self.ready_to  # turn back near the end of the line
         self._ride_to(self.ready_to, READY_SPAWN[1], READY_THROTTLE, dt)
-        if inp.pressed & BTN_A:
+        if inp.pressed & GO:
             self.camera = ThirdPersonCamera(self.player.yaw)
             self.player.boost, self.intro_time = INTRO_BOOST, 0.0
             self.state = INTRO
@@ -162,7 +163,7 @@ class Game:
         p = self.player
         dx, dz = FIGHT_SPAWN[0] - p.x, FIGHT_SPAWN[1] - p.z
         left = math.hypot(dx, dz)
-        if inp.pressed & BTN_A or left <= INTRO_ARRIVE:
+        if inp.pressed & GO or left <= INTRO_ARRIVE:
             self._fight_begins()
             return
         # steer at the spawn while far out, then hold the heading and rein in
@@ -189,7 +190,7 @@ class Game:
         self.hint = HINT_SECONDS
 
     def _fight(self, inp, dt):
-        if inp.pressed & BTN_A:
+        if inp.pressed & BTN_START:  # the pause menu, as on any handheld
             self.state, self.menu_item, self.menu_cooldown = MENU, 0, 0.0
             return
         self.hint = max(0.0, self.hint - dt)
@@ -244,7 +245,9 @@ class Game:
         elif self.menu_cooldown == 0.0 and abs(inp.move_y) > 0.5:
             self.menu_item = (self.menu_item + (1 if inp.move_y < 0 else -1)) % len(MSG_MENU)
             self.menu_cooldown = MENU_REPEAT
-        if inp.pressed & BTN_A:
+        if inp.pressed & BTN_START:  # Start again: back to the fight
+            self.state = FIGHT
+        elif inp.pressed & BTN_A:
             choice = MSG_MENU[self.menu_item]
             if choice == MSG_MENU[1]:
                 self.restart()

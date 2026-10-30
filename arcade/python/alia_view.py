@@ -40,7 +40,7 @@ PX = 2
 
 MESSAGES = (
     "",                                          # 0
-    "PRESS A TO START",                          # 1
+    "PRESS START",                               # 1
     "BREAK THE ARMOR",                           # 2
     "HOOK ON! (X)",                              # 3
     "STRIKE THE HEAD",                           # 4
@@ -51,10 +51,10 @@ MESSAGES = (
     "CONTINUE",                                  # 9  pause menu, item selected
     "RESTART",                                   # 10
     "RECALIBRATE",                               # 11 (unused: no tilt on Alia Pad)
-    "PRESS A TO START",                          # 12 (was the tilt calibration prompt)
+    "PRESS START",                               # 12 (was the tilt calibration prompt)
     "VICTORY - A TO RESTART",                    # 13
     "DEFEATED - A TO RESTART",                   # 14
-    "L MOVE  R LOOK  B SHOOT  X HOOK  A MENU",  # 15
+    "L MOVE  R LOOK  B SHOOT  X HOOK  START MENU",  # 15
     "WAITING FOR PYTHON",                        # 16
     "BREAK THE CRYSTALS",                        # 17
     "JUMP OFF! (X)",                             # 18

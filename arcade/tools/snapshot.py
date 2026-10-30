@@ -97,9 +97,9 @@ def main():
     walk = [raw(jx=40, jy=110)] * 30
     shoot = [raw(held=g3d.BTN_B, rx=70)] * 6
     run("3_walk_shoot", walk + shoot)
-    run("4_menu", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A), raw(jy=-110)])
+    run("4_menu", [raw(pressed=g3d.BTN_START, held=g3d.BTN_START), raw(jy=-110)])
     run("5_missing", [raw(connected=5)])
-    run("6_menu_continue", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A)])  # back to the fight
+    run("6_menu_continue", [raw(pressed=g3d.BTN_A, held=g3d.BTN_A)])  # Continue (A) back to the fight
 
     def look_at(point, distance):
         """Stand `distance` from a point on the ground, facing it, with the camera on it."""
