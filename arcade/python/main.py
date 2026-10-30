@@ -30,21 +30,22 @@ import world  # noqa: E402
 from alia_view import View  # noqa: E402
 from game import Game  # noqa: E402
 
-# Alia Pad buttons are positional; the labels are Nintendo-style (A = East, B = South, X = North).
-BUTTONS = ((ae.EAST, g3d.BTN_A), (ae.SOUTH, g3d.BTN_B), (ae.NORTH, g3d.BTN_C), (ae.R1, g3d.BTN_C),
-           (ae.L3, g3d.BTN_STICK), (ae.START, g3d.BTN_START))
+# The controls as alia-engine input actions (its docs/api.md §6). Alia Pad buttons are positional; the labels
+# are Nintendo-style (A = East, B = South, X = North). Each action is one of the g3d button bits the game reads.
+ACTIONS = {"confirm": ["EAST"], "shoot": ["SOUTH"], "hook": ["NORTH", "R1"], "stick": ["L3"], "pause": ["START"],
+           "ride": {"stick": "left"}, "look": {"stick": "right"}}  # controls.py applies the dead zones
+ACTION_BITS = (("confirm", g3d.BTN_A), ("shoot", g3d.BTN_B), ("hook", g3d.BTN_C), ("stick", g3d.BTN_STICK),
+               ("pause", g3d.BTN_START))
 
 
-def _bits(state):
-    return sum({b for pad, b in BUTTONS if state & pad})
-
-
-def raw_input(inp, seq):
-    """alia_engine.Input -> the g3d.RawInput the game reads (sticks in raw -127..127 units, y up)."""
+def raw_input(actions, seq):
+    """alia_engine.Actions -> the g3d.RawInput the game reads (sticks in raw -127..127 units, y up)."""
     axis = lambda v: max(-127, min(127, round(v * 127)))  # noqa: E731
-    return g3d.RawInput(seq_ack=seq, connected=7, held=_bits(inp.held), pressed=_bits(inp.pressed),
-                        jx=axis(inp.lx), jy=axis(-inp.ly), ax=0, ay=0, az=1000, gx=0, gy=0, render_ms=0, push_ms=0,
-                        rx=axis(inp.rx), ry=axis(-inp.ry))
+    held = sum(bit for name, bit in ACTION_BITS if actions.held(name))
+    pressed = sum(bit for name, bit in ACTION_BITS if actions.pressed(name))
+    (jx, jy), (rx, ry) = actions.axis("ride"), actions.axis("look")
+    return g3d.RawInput(seq_ack=seq, connected=7, held=held, pressed=pressed, jx=axis(jx), jy=axis(-jy), ax=0, ay=0,
+                        az=1000, gx=0, gy=0, render_ms=0, push_ms=0, rx=axis(rx), ry=axis(-ry))
 
 
 class DemoInput:
@@ -67,6 +68,7 @@ class Megalith:
         self.demo = DemoInput() if demo else None
 
     def init(self, engine):
+        engine.actions.load(ACTIONS)
         self.scene = world.make_scene(seed=1, look=world.TIME_OF_DAY[0])
         self.view = View(engine, self.scene)  # first: it loads the meshes the rigs are drawn with
         assets.load(engine)
@@ -78,7 +80,7 @@ class Megalith:
         print(f"Megalith on {engine.describe()}", flush=True)
 
     def fixed_update(self, engine, dt):
-        raw = self.demo(self.seq) if self.demo else raw_input(engine.input, self.seq)
+        raw = self.demo(self.seq) if self.demo else raw_input(engine.actions, self.seq)
         self.frame = self.game.step(raw, dt)
         self.view.update(self.frame, self.game.player.hand())  # the world follows the logic; the engine interpolates between steps
         if self.game.sky_update(dt):
