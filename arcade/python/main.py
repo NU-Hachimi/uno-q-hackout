@@ -73,7 +73,7 @@ class Megalith:
         self.view = View(engine, self.scene)  # first: it loads the meshes the rigs are drawn with
         assets.load(engine)
         self.game = Game(self.scene, engine.world)
-        self.music = audio.Music()
+        self.music = audio.Music(engine)
         self.seq = 0
         self.frame = self.game.step(None, 0.0)  # something to draw before the first step
         self.view.update(self.frame, self.game.player.hand())

@@ -29,7 +29,7 @@
 | `g3d.py` | 原来的通信协议：数据结构 + 打包函数（打包函数现在只有测试在用） | 第 8 步删掉 |
 | `alia_view.py` | 翻译层：Frame → 引擎；Look 调色、地形烘焙、绳子、HUD 排版 | 拆成 `look.py`（调色、天色）和 `hud.py`（HUD），其余删掉 |
 | `tilt_config.py`、`preview.py` | 手感参数（名字还是"倾斜"）、摇杆死区 | 合并成 `tuning.py` |
-| `audio.py` | 用 `aplay` 放音乐 | 第 7 步换成引擎的混音器 |
+| `audio.py` | 放哪首音乐、多大声（引擎的混音器在放，第 7 步） | 保留 |
 | `tools/mesh_build.py`、`rig_build.py`、`audio_build.py` | PC 上把 `assets/` 烘焙成 `python/gen/` | 保留；输出改成引擎的资源包（`meshes.apak` 已经是） |
 | `tools/snapshot.py`（`--alia`）、`cart_art.py`、`cart_build.sh` | 44 张关键帧快照（回归）、卡带美术、卡带打包 | 保留 |
 | `sketch/` | 原来的 MCU 渲染器 | 保留作画面参照（`tests/cpp/render_preview.sh`） |
@@ -66,7 +66,7 @@ tuning.py     手感参数（原 tilt_config.py + preview.py）
 | 5b 激活、挂载 | 引擎有了 `active`（Unity 语义）、`set_parent(keep_world=True)`、`Rig.attach_position()`。打碎的部件 `slot.active = False`（不画、碰撞体也关）；Ready 时 BOSS 用 `fade = 1`（不画，但还能被打到）；`boss.present()` 只剩淡出和闪烁。Player 持有马和骑手两个 rig：马按原来的规则摆（跟着 PC、跑走淡出、落地前淡入；不在时 `active = False`），骑着的时候骑手挂在马鞍上（`SADDLE_TILT`：跟着马背前后晃，飞奔 4°、受击 14°；`False` 是原来的"直立在马鞍上方"），离开、落回都用 `keep_world`，插值不断。手是骑手的 `hand` 挂点；处决里"打中那一刻手在哪"用 `Rig.attach_position()`。`alia_view.py` 不再管任何 rig，只剩 Frame 里的物体、绳子和 HUD。关掉 `SADDLE_TILT` 时 44 个帧包全部一致；打开时 5 个骑行的帧变了（骑手跟着马背倾斜） | ✅ |
 | 键位（2026-10-30） | 按普通掌机的习惯：**Start** 打开暂停菜单，再按一次回到战斗；菜单里 **A** 确认；开局、跳过开场、胜负后重开 A 和 Start 都行（"PRESS START"）。`g3d.BTN_START` 是 Alia Pad 才有的键（原来的 MCU 没有） | ✅ |
 | 6 粒子 | 纯视觉的效果换成引擎的粒子（`effects.py` 的三个模板，数字和原来 Python 里的一样）：子弹落点的火花（`hit`，按子弹的颜色）、打碎部件的碎片（`debris`，按部件的颜色）、处决时手上的火花（`orbs`，`time_scale` 跟着慢动作和打击停顿）。发射器归 Player。去掉了 `Spark`、`MAX_SPARKS = 4` 和处决的 `orbs` 列表；尘环和曳光弹有玩法意义，仍然是 Frame 里的物体。`assets.py` 现在也加载网格和粒子模板（`alia_view.py` 从那里拿网格）。快照工具用 `World.begin_step / end_step` 包住每一步，粒子在截图里也会动、会消失。效果：以前 MCU 的物体上限把处决时的碎片挤掉了，现在弱点碎掉时能看到碎片（快照 `25_execute_shatter`） | ✅ |
-| 7 系统 | 按键映射用引擎的动作映射：`main.py` 的 `ACTIONS` 表（confirm / shoot / hook / stick / pause 五个按钮动作，ride / look 两个摇杆）`load` 进 `engine.actions`，`raw_input()` 从动作拼出游戏读的 `RawInput`（`tests/test_main.py`）✅。`audio.py` 换成引擎的混音器：等引擎的混音器（用户确认声音方案以后） | 一半 |
+| 7 系统 | 按键映射用引擎的动作映射：`main.py` 的 `ACTIONS` 表（confirm / shoot / hook / stick / pause 五个按钮动作，ride / look 两个摇杆）`load` 进 `engine.actions`，`raw_input()` 从动作拼出游戏读的 `RawInput`（`tests/test_main.py`）✅。`audio.py` 换成引擎的混音器：不再起 `aplay` 子进程、不再在 Python 线程里混音和淡入淡出，只告诉引擎放哪首、多大声、从哪儿循环（`music.json`）；"每步调用、同一首只改音量、放完的短曲不重放"的行为不变，换曲从"先淡出再开始"变成交叉淡化 | ✅ |
 | 6b 清理 | `rig.py` 回到简单好读的参考实现：去掉了为板上性能加的姿态缓存、部件槽缓存和手工展开的 3×3 运算（生成的黄金文件逐字节不变）。引擎对照固定的黄金文件 `tests/golden/rig_*.json`（每块骨骼的变换、每个部件槽在生成的 rig 上的位置，差在 2×10⁻⁵ 以内），不再现算 `rig.py`。顺手修了一个偶发失败的测试：`test_boss.py` 的 BOSS 没给随机种子，攻击节奏每次不同 | ✅ |
 | 8 收尾 | **MCU 那条路整个去掉**（原版留在 `main` 分支）：`sketch/`、`tests/cpp/`、`scripts/flash.sh`、`mesh_build.py` / `rig_build.py` 生成的 C 头文件、`g3d.py`（不只是协议：`RawInput`、`Camera`、`Obj`、`Hud`、按键常量是玩法和画面之间传的数据类型，要换成游戏自己的类型或者直接读引擎的输入）、`Frame`、快照里的 `.frame` 包。**先换回归手段**：`.frame` 包逐字节一致是现在最严的检查，删掉之前 `snapshot.py` 改成每个关键帧转储一份游戏状态（PC、BOSS、相机、物体，JSON），比对它和截图。然后拆分 `alia_view.py`，改名（`world.py` → `terrain.py` 等）。`retroarch/` 和 Megalith 无关（比赛的另一个演示），留着 | |
 
