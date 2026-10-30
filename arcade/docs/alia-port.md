@@ -39,7 +39,7 @@ MCU 那条路（`sketch/`、`g3d.py`、`tests/cpp/`、`app.yaml`）第 8 步去�
 
 ## 3. 目标结构（E4 第 8 步）
 
-引擎只给积木（世界里的物体、Animator、碰撞体、粒子发射器），游戏用自己的类组织逻辑（alia-engine `docs/api.md` §8 第 5 条）：
+引擎只给积木（世界里的物体、Animator、碰撞体、粒子发射器），游戏用自己的类组织逻辑（alia-engine `docs/api.md` §9 第 5 条）：
 
 ```
 main.py       alia_engine.run(Megalith())

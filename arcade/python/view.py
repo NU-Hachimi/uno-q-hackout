@@ -39,7 +39,7 @@ class View:
         self.rope = 0
         self.terrain = 0
         # Terrain colours are baked with their shading; the rope is a flat ribbon that never sinks into
-        # the ground fog (alia-engine materials, its docs/api.md §1.3).
+        # the ground fog (alia-engine materials, its docs/api.md §2).
         self.ground_material = engine.create_material(ae.Material(shading=ae.Shading.UNLIT, color=ae.ColorSource.VERTEX))
         self.rope_material = engine.create_material(ae.Material(shading=ae.Shading.UNLIT, color=ae.ColorSource.VERTEX,
                                                                 double_sided=True, ground_fog=False))

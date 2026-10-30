@@ -1,4 +1,4 @@
-"""Megalith's collision categories on alia-engine's colliders (its docs/api.md §1.6).
+"""Megalith's collision categories on alia-engine's colliders (its docs/api.md §5).
 
 The engine holds the shapes and answers the rays (boss.py asks it); this module only says what they mean
 to the game. The boss's rig carries its colliders in gen/rigs.apak, where tools/rig_build.py turns them

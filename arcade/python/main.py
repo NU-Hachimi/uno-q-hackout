@@ -31,7 +31,7 @@ import terrain  # noqa: E402
 from view import View  # noqa: E402
 from game import Game  # noqa: E402
 
-# The controls as alia-engine input actions (its docs/api.md §6). Alia Pad buttons are positional; the labels
+# The controls as alia-engine input actions (its docs/api.md §7). Alia Pad buttons are positional; the labels
 # are Nintendo-style (A = East, B = South, X = North). Each action is one of the button bits the game reads (controls.py).
 ACTIONS = {"confirm": ["EAST"], "shoot": ["SOUTH"], "hook": ["NORTH", "R1"], "stick": ["L3"], "pause": ["START"],
            "ride": {"stick": "left"}, "look": {"stick": "right"}}  # controls.py applies the dead zones

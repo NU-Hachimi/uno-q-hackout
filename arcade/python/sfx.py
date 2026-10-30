@@ -1,4 +1,4 @@
-"""Megalith's sound effects on alia-engine's mixer (its docs/api.md §6). The gameplay only notes what
+"""Megalith's sound effects on alia-engine's mixer (its docs/api.md §7). The gameplay only notes what
 happened where (Player.sounds, Boss.sounds, gathered in Game.sounds each step); this plays them from the
 camera's point of view: panned by where they are, quieter with distance, a little pitch variation so
 repeats don't sound mechanical. The sounds are made by tools/sfx_build.py."""

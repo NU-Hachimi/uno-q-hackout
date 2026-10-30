@@ -1,4 +1,4 @@
-"""Purely visual effects as alia-engine particle templates (its docs/api.md §7): nothing the gameplay reads
+"""Purely visual effects as alia-engine particle templates (its docs/api.md §6): nothing the gameplay reads
 back. The numbers are the ones player.py and finisher.py used when they simulated these in Python (and the
 MCU's MAX_SPARKS = 4 limit is gone). The dust rings and the tracers stay gameplay objects: they hurt or hit."""
 

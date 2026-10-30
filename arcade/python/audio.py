@@ -1,4 +1,4 @@
-"""Megalith's music on alia-engine's mixer (its docs/api.md §6): the engine mixes and hands the system one
+"""Megalith's music on alia-engine's mixer (its docs/api.md §7): the engine mixes and hands the system one
 48 kHz stream; this only says which track, how loud, and where each loops.
 
 Tracks are python/music/*.wav (tools/audio_build.py); music.json says which ones loop and from where, and
