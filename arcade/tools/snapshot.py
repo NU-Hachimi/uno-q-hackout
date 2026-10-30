@@ -54,6 +54,7 @@ def main():
         (out / f"{name}.frame").write_bytes(frame.pack(seq))
         if view:
             view.draw(frame)
+            view.e.end_frame()
             view.e.screenshot(str(out / f"{name}.alia.png"))
 
     def sky(name, t):

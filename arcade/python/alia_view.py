@@ -194,6 +194,7 @@ class View:
 
     # ---- one frame ------------------------------------------------------------------------------
     def draw(self, frame):
+        """Fill this frame's draw list; whoever runs the loop calls end_frame() (alia_engine.run does)."""
         e, f, cam = self.e, self.e.frame, frame.camera
         f.eye, f.yaw, f.pitch, f.fov_x = (cam.x, cam.y, cam.z), cam.yaw, cam.pitch, math.radians(cam.fov)
         f.fog_steps = 0 if frame.flags & g3d.FLAG_NO_FOG else FOG_STEPS
@@ -216,7 +217,6 @@ class View:
         self._rope(frame.hook, hand, cam)
         if not frame.flags & g3d.FLAG_NO_HUD:
             self._hud(frame.hud)
-        e.end_frame()
 
     def _rock_models(self):
         """The scattered scenery never moves: build its matrices once per scene."""
