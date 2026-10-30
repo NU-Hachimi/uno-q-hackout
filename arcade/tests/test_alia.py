@@ -1,40 +1,46 @@
-"""alia-engine evaluates Megalith's rigs in C++ (python/gen/rigs.apak); its poses must match rig.py, the
-reference implementation. Skipped when alia_engine isn't importable (PYTHONPATH=<alia-engine build>)."""
+"""alia-engine poses Megalith's rigs in C++ (python/gen/rigs.apak). Its poses must match the golden files,
+tests/golden/rig_<name>.json, which tools/rig_build.py writes from rig.py (the reference implementation):
+every bone's rig-space transform, and every slot's position on a spawned rig."""
 
-import pytest
+import json
+from pathlib import Path
 
-import rig
+import assets
+import world
+from arena import ENGINE, W
 from gen.rigs import RIGS
 
-ae = pytest.importorskip("alia_engine")
-
-PACK = __import__("pathlib").Path(__file__).resolve().parents[1] / "python" / "gen" / "rigs.apak"
-PHASES = (0, 1, 31, 64, 100, 128, 200, 254, 255)
+GOLDEN = Path(__file__).resolve().parent / "golden"
+TOLERANCE = 2e-5  # float32 against Python's doubles, rounded to 5 decimals in the files
 
 
-def test_engine_poses_match_rig_py():
-    engine = ae.Engine(headless=True)
-    try:
-        rigs = engine.load_rigs(str(PACK))
-        assert set(rigs) == {r["name"] for r in RIGS.values()}
-        worst = 0.0
-        for ref in RIGS.values():
-            mine = rigs[ref["name"]]
-            assert mine.anims == [a["name"] for a in ref["anims"]]
-            for anim in range(len(ref["anims"])):
-                for phase in PHASES:
-                    for m, (r, t) in zip(mine.pose(anim, phase), rig.pose(ref, anim, phase)):
-                        expect = (*r[0], t[0], *r[1], t[1], *r[2], t[2])
-                        worst = max(worst, max(abs(a - b) for a, b in zip(m, expect)))
-        assert worst < 1e-5  # float32 against Python's doubles
-    finally:
-        engine.close()
+def points(m):
+    """Origin and +X/+Y/+Z unit points of a row-major 3x4 transform, as in the golden files."""
+    t = (m[3], m[7], m[11])
+    return [*t] + [t[r] + m[4 * r + c] for c in range(3) for r in range(3)]
+
+
+def test_engine_poses_match_the_golden_files():
+    rigs = assets.load(ENGINE)
+    worst = 0.0
+    for ref in RIGS.values():
+        golden = json.loads((GOLDEN / f"rig_{ref['name']}.json").read_text())
+        mine = rigs[ref["name"]]
+        assert mine.anims == [a["name"] for a in golden["anims"]]
+        node = W.spawn_rig(mine)
+        bones = len(ref["bones"])
+        for anim in golden["anims"]:
+            for phase, want in zip(golden["phases"], anim["poses"]):
+                for m, w in zip(mine.pose(anim["id"], phase), want[:bones]):
+                    worst = max(worst, max(abs(a - b) for a, b in zip(points(m), w)))
+                node.animator.anim, node.animator.phase = anim["id"], phase
+                for slot, w in enumerate(want[bones:]):
+                    worst = max(worst, max(abs(a - b) for a, b in zip(node.slot(slot).world_position, w[:3])))
+        node.destroy()
+    assert worst < TOLERANCE, worst
 
 
 def test_engine_ground_matches_terrain_height():
-    import world
-    from arena import W
-
     scene = world.make_scene(1)
     world.set_ground(W, scene)
     for x in range(-130, 131, 7):

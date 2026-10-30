@@ -15,7 +15,7 @@ from gen.rigs import RIGS
 def make_boss(seed=1):
     scene = world.make_scene(1)
     scene.slot_variants = pick_parts(random.Random(seed))
-    return Boss(scene, W)
+    return Boss(scene, W, random.Random(seed))
 
 
 def test_the_pack_tags_the_boss_colliders():

@@ -1,5 +1,7 @@
-"""Rig pose evaluation (docs/api.md §5.1). The MCU's sketch/rig.cpp must give the same result;
-tests/golden/rig_<name>.json, written from this module, is the reference for both.
+"""Rig pose evaluation (docs/api.md §5.1): the reference implementation. The game itself poses its rigs in
+alia-engine; tools/rig_build.py writes tests/golden/rig_<name>.json from this module, and both the engine
+(tests/test_alia.py) and the MCU's sketch/rig.cpp are checked against those files. Plain and readable on
+purpose: nothing runs it per frame any more.
 
 Affine transforms are (R, t): R a 3x3 row-major tuple of rows, t a 3-tuple; they map p -> R p + t.
 Rig space has its origin on the ground under the boss; world = T(rig pos) · Ry(rig yaw) · rig space.
@@ -26,18 +28,11 @@ def _rz(deg):
 
 
 def _mul3(a, b):
-    # Unrolled (the hot spot on the board); same sums in the same order as the generator form.
-    (a00, a01, a02), (a10, a11, a12), (a20, a21, a22) = a
-    (b00, b01, b02), (b10, b11, b12), (b20, b21, b22) = b
-    return ((a00 * b00 + a01 * b10 + a02 * b20, a00 * b01 + a01 * b11 + a02 * b21, a00 * b02 + a01 * b12 + a02 * b22),
-            (a10 * b00 + a11 * b10 + a12 * b20, a10 * b01 + a11 * b11 + a12 * b21, a10 * b02 + a11 * b12 + a12 * b22),
-            (a20 * b00 + a21 * b10 + a22 * b20, a20 * b01 + a21 * b11 + a22 * b21, a20 * b02 + a21 * b12 + a22 * b22))
+    return tuple(tuple(sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)) for i in range(3))
 
 
 def _apply3(m, v):
-    (m00, m01, m02), (m10, m11, m12), (m20, m21, m22) = m
-    x, y, z = v
-    return (m00 * x + m01 * y + m02 * z, m10 * x + m11 * y + m12 * z, m20 * x + m21 * y + m22 * z)
+    return tuple(m[i][0] * v[0] + m[i][1] * v[1] + m[i][2] * v[2] for i in range(3))
 
 
 def euler(rx, ry, rz):
@@ -47,8 +42,7 @@ def euler(rx, ry, rz):
 
 def compose(a, b):
     """a · b: apply b first, then a."""
-    (tx, ty, tz), (ux, uy, uz) = _apply3(a[0], b[1]), a[1]
-    return _mul3(a[0], b[0]), (tx + ux, ty + uy, tz + uz)
+    return _mul3(a[0], b[0]), tuple(x + y for x, y in zip(_apply3(a[0], b[1]), a[1]))
 
 
 def transform(m, p):
@@ -91,25 +85,8 @@ def _lerp(a, b, t):
     return a + (b - a) * t
 
 
-# Poses by (rig id, animation, phase). Phases are bytes, so there are at most 256 per animation
-# (a few thousand in all); the game asks for the same pose several times per frame (colliders,
-# saddle, hand, drawing), and pure-Python matrix maths is the hot spot on the board's A53.
-_POSES = {}
-
-
 def pose(rig, anim_id, phase):
-    """Rig-space transform of every bone for animation `anim_id` at `phase` (0..255); a tuple, shared
-    between callers, so do not modify it."""
-    if not isinstance(phase, int):
-        return tuple(_pose(rig, anim_id, phase))
-    key = (rig["id"], anim_id, phase)
-    poses = _POSES.get(key)
-    if poses is None:
-        poses = _POSES[key] = tuple(_pose(rig, anim_id, phase))
-    return poses
-
-
-def _pose(rig, anim_id, phase):
+    """Rig-space transform of every bone for animation `anim_id` at `phase` (0..255)."""
     anim = rig["anims"][anim_id]
     i, j, t = key_position(anim, phase)
     out = []
@@ -129,16 +106,9 @@ def _pose(rig, anim_id, phase):
     return out
 
 
-_SLOT_LOCAL = {}  # (rig id, slot) -> the slot's fixed offset and rotation in its bone's frame
-
-
 def slot_matrix(rig, poses, slot_index):
     slot = rig["slots"][slot_index]
-    key = (rig["id"], slot_index)
-    local = _SLOT_LOCAL.get(key)
-    if local is None:
-        local = _SLOT_LOCAL[key] = compose(translate(slot["offset"]), rotate(*slot["rot"]))
-    return compose(poses[slot["bone_index"]], local)
+    return compose(poses[slot["bone_index"]], compose(translate(slot["offset"]), rotate(*slot["rot"])))
 
 
 def attach_matrix(rig, poses, name):

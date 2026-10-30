@@ -27,7 +27,7 @@ def vantage(boss, slot, dist=20.0):
 def make_boss(seed=1):
     scene = world.make_scene(1)
     scene.slot_variants = pick_parts(random.Random(seed))
-    return scene, Boss(scene, W)
+    return scene, Boss(scene, W, random.Random(seed))  # seeded: its attack timing is random
 
 
 def test_stands_still_until_it_attacks():

@@ -67,7 +67,7 @@ tuning.py     手感参数（原 tilt_config.py + preview.py）
 | 键位（2026-10-30） | 按普通掌机的习惯：**Start** 打开暂停菜单，再按一次回到战斗；菜单里 **A** 确认；开局、跳过开场、胜负后重开 A 和 Start 都行（"PRESS START"）。`g3d.BTN_START` 是 Alia Pad 才有的键（原来的 MCU 没有） | ✅ |
 | 6 粒子 | 纯视觉的效果换成引擎的粒子（`effects.py` 的三个模板，数字和原来 Python 里的一样）：子弹落点的火花（`hit`，按子弹的颜色）、打碎部件的碎片（`debris`，按部件的颜色）、处决时手上的火花（`orbs`，`time_scale` 跟着慢动作和打击停顿）。发射器归 Player。去掉了 `Spark`、`MAX_SPARKS = 4` 和处决的 `orbs` 列表；尘环和曳光弹有玩法意义，仍然是 Frame 里的物体。`assets.py` 现在也加载网格和粒子模板（`alia_view.py` 从那里拿网格）。快照工具用 `World.begin_step / end_step` 包住每一步，粒子在截图里也会动、会消失。效果：以前 MCU 的物体上限把处决时的碎片挤掉了，现在弱点碎掉时能看到碎片（快照 `25_execute_shatter`） | ✅ |
 | 7 系统 | `audio.py` 换成引擎的混音器；按键映射用引擎的动作映射 | |
-| 6b 清理 | `rig.py` 回到简单好读的参考实现（去掉姿态缓存和手工展开）；引擎的黄金姿态存成固定文件 | |
+| 6b 清理 | `rig.py` 回到简单好读的参考实现：去掉了为板上性能加的姿态缓存、部件槽缓存和手工展开的 3×3 运算（生成的黄金文件逐字节不变）。引擎对照固定的黄金文件 `tests/golden/rig_*.json`（每块骨骼的变换、每个部件槽在生成的 rig 上的位置，差在 2×10⁻⁵ 以内），不再现算 `rig.py`。顺手修了一个偶发失败的测试：`test_boss.py` 的 BOSS 没给随机种子，攻击节奏每次不同 | ✅ |
 | 8 收尾 | **MCU 那条路整个去掉**（原版留在 `main` 分支）：`sketch/`、`tests/cpp/`、`scripts/flash.sh`、`mesh_build.py` / `rig_build.py` 生成的 C 头文件、`g3d.py`（不只是协议：`RawInput`、`Camera`、`Obj`、`Hud`、按键常量是玩法和画面之间传的数据类型，要换成游戏自己的类型或者直接读引擎的输入）、`Frame`、快照里的 `.frame` 包。**先换回归手段**：`.frame` 包逐字节一致是现在最严的检查，删掉之前 `snapshot.py` 改成每个关键帧转储一份游戏状态（PC、BOSS、相机、物体，JSON），比对它和截图。然后拆分 `alia_view.py`，改名（`world.py` → `terrain.py` 等）。`retroarch/` 和 Megalith 无关（比赛的另一个演示），留着 | |
 
 ## 5. 怎么验收
