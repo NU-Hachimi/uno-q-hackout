@@ -28,11 +28,8 @@ HIT_STOP = 0.12           # s frozen on the hit
 DIE = 2.5                 # s from the shatter to the boss gone
 FADE = 1.5                # s at the end of DIE the boss sinks into the fog; the rider lets go as it starts
 TAIL = 0.6                # s held on the empty field (with the PC back in the saddle) before the victory screen
-ORB_LIFE = 0.8            # s of game time a spark lives (slow motion slows it too)
-ORB_SPEED = (2.5, 5.0)    # m/s outwards
-ORB_SCALE = 1.2           # at birth; it shrinks with age
 FLASH_SECONDS = 0.35      # the big flash on the hand at the hit
-FLASH_SCALE = 4 * ORB_SCALE
+FLASH_SCALE = 4.8         # 4 x a spark (effects.py "orbs", size 1.2)
 CAMERA_DIST = (8.0, 20.0)  # m from the target, pulling back while the boss dies
 CAMERA_AROUND = math.radians(30)  # off the boss's nose towards its right: in front of the antlers, never behind them
 CAMERA_ELEVATION = math.radians(30)  # looking down on the weak point
@@ -59,7 +56,6 @@ class Finisher:
         self.time = 0.0           # s of game time since B
         self.frozen = 0.0         # s of hit stop left
         self.flash = 0.0          # s of hand flash left
-        self.orbs = []            # [x, y, z, vx, vy, vz, age]
         self.after = None         # s of game time since the shatter
         self.dropped = False
         weak, anchor = self.weak_point(), player.anchor(boss)
@@ -88,6 +84,7 @@ class Finisher:
         self.flash = max(0.0, self.flash - dt)
         gdt = dt * rate
         self.time += gdt
+        player.orbs.time_scale = rate  # the sparks live in game time too
         boss.update(gdt, player)
 
         if not self.dropped:
@@ -101,7 +98,6 @@ class Finisher:
         else:  # falling back into the saddle like after letting go
             player.update(Input(), game.camera, gdt, boss, aim.Aim((0, 0, 0), (0, 0, 1)))
 
-        self._advance_orbs(gdt)
         if self.after is None:
             return False
         self.after += gdt
@@ -144,31 +140,14 @@ class Finisher:
                     boss.play("kneel")
 
     def _burst(self, n):
-        x, y, z = self._hand()
-        rng = self.game.player.rng
-        for _ in range(n):
-            a = rng.uniform(0, 2 * math.pi)
-            speed = rng.uniform(*ORB_SPEED)
-            self.orbs.append([x, y, z, math.cos(a) * speed, rng.uniform(1.5, 4.5), math.sin(a) * speed, 0.0])
-
-    def _advance_orbs(self, gdt):
-        for orb in self.orbs:
-            orb[0] += orb[3] * gdt
-            orb[1] += orb[4] * gdt
-            orb[2] += orb[5] * gdt
-            orb[4] -= 9.8 * gdt
-            orb[6] += gdt
-        self.orbs = [o for o in self.orbs if o[6] < ORB_LIFE]
+        self.game.player.orbs.burst(n, at=self._hand())
 
     def objects(self):
-        """The hand flash and the sparks, newest first (MAX_OBJ cuts the tail). Drawn with the `spark` mesh
-        until the renderer has `spark_orb` (art.md §6)."""
+        """The hand flash (the sparks are particles, effects.py). Drawn with the `spark` mesh until the renderer
+        has `spark_orb` (art.md §6)."""
         out = []
         if self.flash > 0:
             out.append(g3d.Obj(mesh_ids.SPARK, *self._hand(), scale=FLASH_SCALE, tint=palette.FLASH))
-        for x, y, z, _, _, _, age in reversed(self.orbs):
-            out.append(g3d.Obj(mesh_ids.SPARK, x, y, z, yaw=age * 20, scale=ORB_SCALE * (1 - 0.7 * age / ORB_LIFE),
-                               tint=palette.SIGIL))
         return out
 
     def view(self):

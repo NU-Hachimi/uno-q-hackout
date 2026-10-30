@@ -180,7 +180,7 @@ def test_finisher_prompts_then_b_plays_it_and_wins():
         if hit is None and fin.frozen > 0:
             hit = time
             assert math.dist(fin._hand(), fin.weak_point()) < 0.3  # the hook goes into the weak point
-            assert frame.objects[0].tint == palette.FLASH and len(fin.orbs) == 8
+            assert frame.objects[0].tint == palette.FLASH and game.player.orbs.count == 8
         if shattered is None and boss.defeated():
             shattered = time
     expect_hit = fin.hit_phase / 255 * EXECUTE_SECONDS

@@ -28,6 +28,14 @@ def raw(jx=0, jy=0, held=0, pressed=0, rx=0, ry=0):
     return g3d.RawInput(0, 7, held, pressed, jx, jy, 0, 0, 1000, 0, 0, 0, 0, rx, ry)
 
 
+def step(engine, game, r):
+    """One logic step as alia_engine.run takes it: the world's step hooks around the game's."""
+    engine.world.begin_step()
+    frame = game.step(r, DT)
+    engine.world.end_step(DT)
+    return frame
+
+
 def fight(engine, scene, day, before=None):
     """A fresh round with the ride-in skipped, at `day` seconds into the day cycle (`before`, the last
     round, is taken out of the world)."""
@@ -35,7 +43,7 @@ def fight(engine, scene, day, before=None):
         before.close()
     game = Game(scene, engine.world, seed=7)
     for r in (raw(pressed=g3d.BTN_A), raw(), raw(pressed=g3d.BTN_A)):
-        game.step(r, DT)
+        step(engine, game, r)
     game.day = day
     return game
 
@@ -53,7 +61,7 @@ def look_at(game, point, distance, side=0.0):
 def shoot(engine, view, game, path, hud=True, steps=1, inputs=raw):
     frame = None
     for _ in range(steps):
-        frame = game.step(inputs(), DT)
+        frame = step(engine, game, inputs())
     if not hud:
         frame.flags |= g3d.FLAG_NO_HUD
     view.set_sky(*world.sky_at(game.day))

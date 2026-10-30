@@ -235,8 +235,8 @@ def test_tap_during_cooldown_fires_when_it_ends():
 
 
 def test_frame_objects_fit_the_packet():
-    from player import MAX_SPARKS, MAX_TRACERS
-    assert 1 + MAX_TRACERS + MAX_SPARKS + 1 <= g3d.MAX_OBJ  # hook, tracers, sparks, shockwave
+    from player import MAX_TRACERS
+    assert 1 + MAX_TRACERS + 1 <= g3d.MAX_OBJ  # hook, tracers, shockwave (sparks are particles now)
 
 
 def test_music_follows_the_round():

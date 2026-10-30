@@ -34,10 +34,7 @@ SHOT_COOLDOWN = 0.25    # s
 SHOT_RANGE = 80.0       # m
 TRACER_SPEED = 120.0    # m/s; the hit lands when the streak arrives
 MAX_TRACERS = 3
-MAX_SPARKS = 4          # objects per frame: hook 1 + tracers 3 + sparks 4 + boss shockwave 1 = 9
-HIT_SPARK_LIFE = 0.25   # s
-DEBRIS_LIFE = 0.6       # s
-DEBRIS_COUNT = 6
+DEBRIS_COUNT = 6        # fragments when a part breaks (effects.py "debris")
 GRAVITY = 9.8
 INVULNERABLE = 1.0      # s after being hit
 HURT_FLASH = 0.3        # s of red screen after being hit
@@ -82,20 +79,6 @@ class Tracer:
     tint: int = 0        # spark colour on arrival
 
 
-@dataclass
-class Spark:
-    x: float
-    y: float
-    z: float
-    vx: float = 0.0
-    vy: float = 0.0
-    vz: float = 0.0
-    age: float = 0.0
-    life: float = HIT_SPARK_LIFE
-    tint: int = 0
-    falls: bool = False
-
-
 def _wrap(angle):
     return (angle + math.pi) % (2 * math.pi) - math.pi
 
@@ -110,7 +93,6 @@ class Player:
         self.hp = HP_MAX
         self.cooldown = 0.0
         self.tracers = []
-        self.sparks = []
         self.hook = None       # FLYING / RETURNING / PULLING / HOOKED, or None
         self.hook_anchor = None  # the boss's hook point node the hook holds (it moves with the bone), if any
         self.hook_from = (0.0, 0.0, 0.0)  # hand position when fired
@@ -141,6 +123,10 @@ class Player:
         for node in (self.horse, self.rider):
             node.set_subtree(light=ae.Light.CHARACTER)
         self.saddle, self.hand_point = self.horse.attach_point("saddle"), self.rider.attach_point("hand")
+        # Sparks where shots land, debris of broken parts, the finisher's sparks: particles (effects.py).
+        seed = self.rng.randrange(1 << 30)
+        self.hits, self.debris_fx, self.orbs = (w.spawn_emitter(assets.PARTICLES[name], seed=seed + k)
+                                                for k, name in enumerate(("hit", "debris", "orbs")))
         self._horse_fade = 0.0
         self._on_saddle = False
         self.present()
@@ -149,7 +135,7 @@ class Player:
 
     def close(self):
         """Take the horse and the rider out of the world (a new round makes a new PC)."""
-        for node in (self.horse, self.rider):
+        for node in (self.horse, self.rider, self.hits, self.debris_fx, self.orbs):
             if node.alive:
                 node.destroy()
 
@@ -433,25 +419,12 @@ class Player:
             if t.slot >= 0:
                 boss.damage(t.slot, t.damage, t.hooked)
             if t.tint:
-                self._add_spark(Spark(t.x, t.y, t.z, tint=t.tint))
+                self.hits.burst(1, at=(t.x, t.y, t.z), tint=t.tint)
         self.tracers = flying
-        for s in self.sparks:
-            s.age += dt
-            s.x, s.y, s.z = s.x + s.vx * dt, s.y + s.vy * dt, s.z + s.vz * dt
-            if s.falls:
-                s.vy -= GRAVITY * dt
-        self.sparks = [s for s in self.sparks if s.age < s.life]
-
-    def _add_spark(self, spark):
-        self.sparks = (self.sparks + [spark])[-MAX_SPARKS:]
 
     def debris(self, pos, tint):
         """A broken part bursts into falling fragments (art.md §6)."""
-        for _ in range(DEBRIS_COUNT):
-            a = self.rng.uniform(0, 2 * math.pi)
-            speed = self.rng.uniform(2.0, 5.0)
-            self._add_spark(Spark(pos[0], pos[1], pos[2], math.cos(a) * speed, self.rng.uniform(2.0, 6.0),
-                                  math.sin(a) * speed, life=DEBRIS_LIFE, tint=tint, falls=True))
+        self.debris_fx.burst(DEBRIS_COUNT, at=pos, tint=tint)
 
     def _horse_block(self):
         """The horse: under the rider, fading out after the rider left it, or fading in before touchdown."""
@@ -489,8 +462,4 @@ class Player:
             horizontal = math.hypot(t.vx, t.vz)
             objs.append(g3d.Obj(mesh_ids.BULLET, t.x, t.y, t.z, yaw=math.atan2(t.vx, t.vz),
                                 pitch=-math.atan2(t.vy, horizontal), scale=3.0))  # long streak: readable at 240x160
-        for s in self.sparks:
-            grow = 1.0 + (1.0 if s.falls else 3.0) * s.age / s.life
-            objs.append(g3d.Obj(mesh_ids.SPARK, s.x, s.y, s.z, yaw=s.age * 20, scale=grow * (3.0 if s.falls else 1.0),
-                                tint=s.tint))
         return objs

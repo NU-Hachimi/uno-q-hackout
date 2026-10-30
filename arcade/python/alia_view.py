@@ -16,12 +16,12 @@ from pathlib import Path
 
 import alia_engine as ae
 
+import assets
 import g3d
 import world
 from gen import mesh_ids
 from gen import palette as pal
 
-MESH_PACK = Path(__file__).resolve().parent / "gen" / "meshes.apak"  # alia-engine resource pack (tools/mesh_build.py)
 _LOOK = struct.Struct("<32HBBBbBHHBBB")
 
 # Lights and materials (sketch/render.cpp).
@@ -127,9 +127,9 @@ class View:
 
     # ---- assets -------------------------------------------------------------------------------
     def _load_meshes(self):
-        """Mesh id (gen/mesh_ids.py) -> engine mesh, from the resource pack."""
-        by_name = self.e.load_meshes(str(MESH_PACK))
-        return {mid: by_name[name] for mid, name in mesh_ids.NAMES.items() if name in by_name}
+        """Mesh id (gen/mesh_ids.py) -> engine mesh (assets.py loads the pack)."""
+        assets.load(self.e)
+        return assets.MESHES
 
     def _terrain_mesh(self, grass_a, grass_b):
         s = self.scene
@@ -210,7 +210,8 @@ class View:
             self._hud(frame.hud)
 
     def _objects(self, objects):
-        """Bullets, sparks, the hook head, dust rings: pooled nodes by mesh. Objects have no identity from
+        """Bullets, the hook head, dust rings, the finisher's flash: pooled nodes by mesh (sparks and debris are
+        particles, effects.py). Objects have no identity from
         one Frame to the next, so they are placed without blending (teleport)."""
         used = {}
         for o in objects:

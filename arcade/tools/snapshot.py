@@ -59,6 +59,13 @@ def main():
             game.close()
         return Game(scene, engine.world, seed=7)
 
+    def step(r, dt):
+        """One logic step as alia_engine.run takes it: the world's step hooks around the game's."""
+        engine.world.begin_step()
+        frame = game.step(r, dt)
+        engine.world.end_step(dt)
+        return frame
+
     game = new_game()  # picks this round's parts into scene.slot_variants
     write_scene(out / "scene.bin", scene)
     seq = 0
@@ -80,7 +87,7 @@ def main():
         nonlocal seq
         frame = None
         for r in inputs:
-            frame = game.step(r, DT)
+            frame = step(r, DT)
         save(name, frame)
         seq += 1
 
@@ -90,7 +97,7 @@ def main():
     run("2b_intro_near", [raw()] * 60)
     intro = 0
     while game.state == "intro" and intro < 400:
-        game.step(raw(), DT)
+        step(raw(), DT)
         intro += 1
     run("2_fight_hint", [raw()])
     # Walk forward and right for 1.5 s, then hold B while turning a little with the right stick.
@@ -151,20 +158,20 @@ def main():
     boss.play("rear_stomp")
     steps = 0
     while not (boss.waves and boss.waves[0][3] >= 7.0) and steps < 100:
-        game.step(raw(), DT)
+        step(raw(), DT)
         steps += 1
     run("17_stomp_ring", [raw()])
     # Mid-charge: the PC 30 m away gets run at, head down
     game = new_game()
     for r in skip_intro:  # Ready -> Intro -> Fight
-        game.step(r, DT)
+        step(r, DT)
     boss = game.boss
     game.player.x, game.player.z = boss.x, boss.z - 30
     game.player.yaw = game.camera.yaw = 0.0
     boss.timer = 0.0
     steps = 0
     while not (boss.state == CHARGING and boss.charge_left < 22) and steps < 200:
-        game.step(raw(), DT)
+        step(raw(), DT)
         steps += 1
     run("18_charge", [raw()])
 
@@ -173,7 +180,7 @@ def main():
         nonlocal seq
         frame = None
         for _ in range(limit):
-            frame = game.step(inputs() if inputs else raw(), DT)
+            frame = step(inputs() if inputs else raw(), DT)
             if done():
                 break
         save(name, frame)
