@@ -15,7 +15,7 @@ import math
 import aim
 import assets
 import screen
-import world
+import terrain
 from controls import Input
 from gen import mesh_ids, palette
 from player import RIDER
@@ -163,6 +163,6 @@ class Finisher:
         dist = CAMERA_DIST[0] + (CAMERA_DIST[1] - CAMERA_DIST[0]) * k
         flat = dist * math.cos(CAMERA_ELEVATION)
         x, z = target[0] + math.sin(heading) * flat, target[2] + math.cos(heading) * flat
-        y = max(target[1] + dist * math.sin(CAMERA_ELEVATION), world.terrain_height(boss.scene, x, z) + 1.0)
+        y = max(target[1] + dist * math.sin(CAMERA_ELEVATION), terrain.terrain_height(boss.scene, x, z) + 1.0)
         dx, dy, dz = target[0] - x, target[1] - y, target[2] - z
         return screen.Camera(x, y, z, yaw=math.atan2(dx, dz), pitch=math.atan2(dy, math.hypot(dx, dz)))

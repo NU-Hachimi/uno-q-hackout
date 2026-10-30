@@ -6,14 +6,14 @@ import random
 
 import assets
 import collide
-import world
+import terrain
 from arena import W
 from boss import Boss, pick_parts
 from gen.rigs import RIGS
 
 
 def make_boss(seed=1):
-    scene = world.make_scene(1)
+    scene = terrain.make_scene(1)
     scene.slot_variants = pick_parts(random.Random(seed))
     return Boss(scene, W, random.Random(seed))
 

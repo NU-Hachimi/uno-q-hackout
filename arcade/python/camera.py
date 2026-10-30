@@ -1,11 +1,11 @@
-"""Third-person camera behind the PC's right shoulder: it turns with the horse (stick steering) and tilt adds
-a look offset on top; riding without tilt eases it back behind the horse (tilt_config.py section 6)."""
+"""Third-person camera behind the PC's right shoulder: it turns with the horse (stick steering) and the right
+stick adds a look offset on top; riding without looking eases it back behind the horse (tuning.py section 4)."""
 
 import math
 
 import screen
-import tilt_config as tilt
-import world
+import tuning
+import terrain
 
 DISTANCE = 7.5             # m behind the pivot (the PC rides a horse: 2.7 m tall, 2.4 m long)
 PIVOT_HEIGHT = 2.2         # m above the horse's hooves
@@ -28,27 +28,27 @@ def right(yaw):
 class ThirdPersonCamera:
     def __init__(self, yaw=0.0):
         self.yaw = yaw
-        self.pitch = math.radians(tilt.START_PITCH_DEG)
-        self.since_tilt = 0.0  # s since the last tilt look input
+        self.pitch = math.radians(tuning.START_PITCH_DEG)
+        self.since_look = 0.0  # s since the right stick last looked
 
     def turn(self, inp, dt, on_boss=False):
         """Tilt look (before the PC moves). On the boss's brow it can look further down; after letting go
         a pitch below the riding limit eases back up instead of jumping."""
         self.yaw -= inp.yaw_rate * dt  # turning right lowers yaw (see right())
-        lo = math.radians(tilt.HOOKED_MIN_PITCH_DEG if on_boss else tilt.MIN_PITCH_DEG)
-        hi = math.radians(tilt.MAX_PITCH_DEG)
+        lo = math.radians(tuning.HOOKED_MIN_PITCH_DEG if on_boss else tuning.MIN_PITCH_DEG)
+        hi = math.radians(tuning.MAX_PITCH_DEG)
         pitch = self.pitch + inp.pitch_rate * dt
         if pitch < lo:
-            pitch = min(lo, max(pitch, self.pitch) + math.radians(tilt.MAX_PITCH_RATE_DEG) * dt)
+            pitch = min(lo, max(pitch, self.pitch) + math.radians(tuning.MAX_PITCH_RATE_DEG) * dt)
         self.pitch = min(hi, pitch)
-        self.since_tilt = 0.0 if inp.yaw_rate else self.since_tilt + dt
+        self.since_look = 0.0 if inp.yaw_rate else self.since_look + dt
 
     def follow(self, player, dt):
-        """After the PC moved: turn with its steering, and recenter behind it while it rides without tilt."""
+        """After the PC moved: turn with its steering, and recenter behind it while it rides without tuning."""
         self.yaw += player.steer
-        if tilt.RECENTER_RATE > 0 and not player.standing and self.since_tilt > tilt.RECENTER_DELAY_S:
+        if tuning.RECENTER_RATE > 0 and not player.standing and self.since_look > tuning.RECENTER_DELAY_S:
             delta = (player.yaw - self.yaw + math.pi) % (2 * math.pi) - math.pi
-            self.yaw += delta * min(1.0, tilt.RECENTER_RATE * dt)
+            self.yaw += delta * min(1.0, tuning.RECENTER_RATE * dt)
 
     def view(self, player, scene):
         """screen.Camera looking along (yaw, pitch) from behind the PC."""
@@ -56,5 +56,5 @@ class ThirdPersonCamera:
         x = player.x - d[0] * DISTANCE + r[0] * SHOULDER
         z = player.z - d[2] * DISTANCE + r[2] * SHOULDER
         y = player.y + PIVOT_HEIGHT + LIFT - d[1] * DISTANCE
-        y = max(y, world.terrain_height(scene, x, z) + GROUND_CLEARANCE)
+        y = max(y, terrain.terrain_height(scene, x, z) + GROUND_CLEARANCE)
         return screen.Camera(x, y, z, self.yaw, self.pitch, FOV)

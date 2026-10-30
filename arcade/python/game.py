@@ -9,7 +9,7 @@ import random
 
 import aim as aiming
 import screen
-import world
+import terrain
 from boss import Boss, pick_parts
 from camera import ThirdPersonCamera
 from controls import BTN_A, BTN_B, BTN_START, Controls, Input
@@ -53,21 +53,21 @@ class Game:
         """`w`: the alia_engine.World the round plays in (the boss's rig and colliders, the ground)."""
         self.scene = scene
         self.w = w
-        world.set_ground(w, scene)
+        terrain.set_ground(w, scene)
         self.rng = random.Random(seed)
-        self.day = 0.0           # s on the day-cycle clock (world.sky_at); runs in Ready and Fight
+        self.day = 0.0           # s on the day-cycle clock (terrain.sky_at); runs in Ready and Fight
         self.sky_sent = None     # the sky last handed out; None makes the next sky_update() hand it out
         self.sky_wait = 0.0
         self.controls = Controls()
         self.restart()
 
     def sky_update(self, dt):
-        """world.sky_at() of now when the sky has changed since the last one handed out (at most every
+        """terrain.sky_at() of now when the sky has changed since the last one handed out (at most every
         SKY_PERIOD), else None."""
         self.sky_wait -= dt
         if self.sky_wait > 0:
             return None
-        sky = world.sky_at(self.day)
+        sky = terrain.sky_at(self.day)
         if sky == self.sky_sent:
             return None
         self.sky_sent, self.sky_wait = sky, SKY_PERIOD
@@ -167,7 +167,7 @@ class Game:
     def _fight_begins(self):
         p = self.player
         p.x, p.z = FIGHT_SPAWN
-        p.y = world.terrain_height(self.scene, p.x, p.z)
+        p.y = terrain.terrain_height(self.scene, p.x, p.z)
         p.yaw = math.atan2(self.boss.x - p.x, self.boss.z - p.z)
         p.boost, p.speed, p.standing = 1.0, 0.0, True
         self.boss.fade = 0.0

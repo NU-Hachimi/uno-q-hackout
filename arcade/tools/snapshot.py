@@ -21,7 +21,7 @@ import alia_engine  # noqa: E402
 
 import assets  # noqa: E402
 import controls  # noqa: E402
-import world  # noqa: E402
+import terrain  # noqa: E402
 from boss import CHARGING, STRIKING  # noqa: E402
 from game import Game  # noqa: E402
 
@@ -30,7 +30,7 @@ NEUTRAL_G = (0, 0, 1000)  # mg; unused since the right stick replaced tilt
 
 
 def raw(jx=0, jy=0, held=0, pressed=0, connected=7, accel=NEUTRAL_G, rx=0, ry=0):
-    # Stick values in raw units with preview.py's INVERT_Y: pushing forward reads positive jy.
+    # Stick values in raw units with tuning.STICK_INVERT_Y: pushing forward reads positive jy.
     return controls.RawInput(0, connected, held, pressed, jx, jy, *accel, 0, 0, 0, 0, rx, ry)
 
 
@@ -66,11 +66,11 @@ def state_of(game, frame):
 def main():
     out = Path(sys.argv[1])
     out.mkdir(parents=True, exist_ok=True)
-    scene = world.make_scene(seed=1)
+    scene = terrain.make_scene(seed=1)
     engine = alia_engine.Engine(headless=True)
     view = None
     if "--alia" in sys.argv[2:]:
-        from alia_view import View
+        from view import View
         view = View(engine, scene)  # before the game: it loads the meshes the boss's rig is drawn with
     assets.load(engine)
     game = None
@@ -101,7 +101,7 @@ def main():
 
     def sky(name, t):
         if view:
-            view.set_sky(*world.sky_at(t))
+            view.set_sky(*terrain.sky_at(t))
 
     def run(name, inputs):
         nonlocal seq
@@ -164,9 +164,9 @@ def main():
     game = new_game()
     skip_intro = [raw(pressed=controls.BTN_A, held=controls.BTN_A), raw(), raw(pressed=controls.BTN_A, held=controls.BTN_A)]
     run("15_ride", skip_intro + [raw(jx=-30, jy=100)] * 20 + [raw(held=controls.BTN_B)] * 3)
-    period = world.DAY_HOLD + world.DAY_BLEND
+    period = terrain.DAY_HOLD + terrain.DAY_BLEND
     for k in range(8):
-        t = (k // 2) * period + (world.DAY_HOLD / 2 if k % 2 == 0 else world.DAY_HOLD + world.DAY_BLEND / 2)
+        t = (k // 2) * period + (terrain.DAY_HOLD / 2 if k % 2 == 0 else terrain.DAY_HOLD + terrain.DAY_BLEND / 2)
         name = f"16_{k}_day_{t:04.0f}s"
         sky(name, t)
         run(name, [raw()])

@@ -1,4 +1,4 @@
-"""What the game shows each step (game.Game.step -> Frame), read by alia_view.py: the camera, the objects
+"""What the game shows each step (game.Game.step -> Frame), read by view.py: the camera, the objects
 that come and go (bullets, the hook head, dust rings, the finisher's flash), the HUD, the rope's hook,
 and the rig blocks (the rigs themselves are the boss's and the player's own nodes in the engine's world;
 the blocks remain for the snapshots' state dumps). These were the MCU protocol's records (the old g3d.py);
@@ -44,7 +44,7 @@ class Hud:
     hp_max: int = 0
     boss_hp: int = 0
     msg: int = 0
-    reticle_dx: int = 0  # pixels at 240x160 (alia_view.py scales them)
+    reticle_dx: int = 0  # pixels at 240x160 (hud.py scales them)
     reticle_dy: int = 0
     reticle_flags: int = 0
     timer: int = 0

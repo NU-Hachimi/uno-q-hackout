@@ -1,11 +1,10 @@
 """Controller mapping: move stick, button edges and right-stick look rates (docs/plan.md 操作表; on Alia Pad
-the right stick replaces tilt, tilt_config.py)."""
+the right stick replaces tilt; the numbers are in tuning.py)."""
 
 import math
 from dataclasses import dataclass
 
-import tilt_config as tilt
-from preview import DEAD_ZONE, INVERT_X, INVERT_Y
+import tuning
 
 # Buttons as the game reads them (main.py makes them from alia-engine's input actions).
 BTN_A, BTN_B, BTN_C, BTN_STICK, BTN_START = 1, 2, 4, 8, 16
@@ -48,11 +47,11 @@ class Input:
 
 
 def look_rate(v, max_rate_deg):
-    """Right stick deflection (-1..1) -> view rate in rad/s (tilt_config dead zone and curve)."""
-    t = (abs(v) - tilt.DEAD_ZONE) / (1.0 - tilt.DEAD_ZONE)
+    """Right stick deflection (-1..1) -> view rate in rad/s (tuning.py's dead zone and curve)."""
+    t = (abs(v) - tuning.LOOK_DEAD_ZONE) / (1.0 - tuning.LOOK_DEAD_ZONE)
     if t <= 0:
         return 0.0
-    return math.copysign(min(t, 1.0) ** tilt.CURVE * math.radians(max_rate_deg), v)
+    return math.copysign(min(t, 1.0) ** tuning.CURVE * math.radians(max_rate_deg), v)
 
 
 class Controls:
@@ -65,17 +64,17 @@ class Controls:
         inp.held, inp.pressed = raw.held & buttons, raw.pressed & buttons
 
         if raw.connected & 2:
-            sx = -raw.jx if INVERT_X else raw.jx
-            sy = -raw.jy if INVERT_Y else raw.jy  # positive = down, as in preview.py
+            sx = -raw.jx if tuning.STICK_INVERT_X else raw.jx
+            sy = -raw.jy if tuning.STICK_INVERT_Y else raw.jy  # positive = down (tuning.STICK_INVERT_Y)
             fx, fy = sx, -sy
             mag = math.hypot(fx, fy)
-            if mag > DEAD_ZONE:
-                scale = min(1.0, (mag - DEAD_ZONE) / (STICK_FULL - DEAD_ZONE)) / mag
+            if mag > tuning.STICK_DEAD_ZONE:
+                scale = min(1.0, (mag - tuning.STICK_DEAD_ZONE) / (STICK_FULL - tuning.STICK_DEAD_ZONE)) / mag
                 inp.move_x, inp.move_y = fx * scale, fy * scale
-            rx = -raw.rx if tilt.INVERT_YAW else raw.rx
-            ry = -raw.ry if tilt.INVERT_PITCH else raw.ry
-            inp.yaw_rate = look_rate(rx / LOOK_FULL, tilt.MAX_YAW_RATE_DEG)
-            inp.pitch_rate = look_rate(ry / LOOK_FULL, tilt.MAX_PITCH_RATE_DEG)
+            rx = -raw.rx if tuning.INVERT_YAW else raw.rx
+            ry = -raw.ry if tuning.INVERT_PITCH else raw.ry
+            inp.yaw_rate = look_rate(rx / LOOK_FULL, tuning.MAX_YAW_RATE_DEG)
+            inp.pitch_rate = look_rate(ry / LOOK_FULL, tuning.MAX_PITCH_RATE_DEG)
         return inp
 
 

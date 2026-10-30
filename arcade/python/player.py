@@ -22,8 +22,8 @@ import camera
 import collide
 import controls
 import screen
-import tilt_config as tilt
-import world
+import tuning
+import terrain
 from gen import mesh_ids, palette
 from gen.rigs import RIGS
 
@@ -90,7 +90,7 @@ class Player:
         self.scene = scene
         self.w = w
         self.x, self.z, self.yaw = x, z, yaw
-        self.y = world.terrain_height(scene, x, z)
+        self.y = terrain.terrain_height(scene, x, z)
         self.hp = HP_MAX
         self.cooldown = 0.0
         self.tracers = []
@@ -260,12 +260,12 @@ class Player:
 
     def _walk(self, inp, cam, dt, boss):
         """Ride: stick x steers (the camera follows through self.steer), stick y is the throttle."""
-        self.steer = -inp.move_x * math.radians(tilt.STEER_RATE_DEG) * dt  # turning right lowers yaw
+        self.steer = -inp.move_x * math.radians(tuning.STEER_RATE_DEG) * dt  # turning right lowers yaw
         self.yaw = _wrap(self.yaw + self.steer)
-        self.speed = inp.move_y if inp.move_y >= 0 else inp.move_y * tilt.REVERSE_FRACTION
+        self.speed = inp.move_y if inp.move_y >= 0 else inp.move_y * tuning.REVERSE_FRACTION
         if abs(self.speed) > 1e-3:
             f = camera.forward(self.yaw)
-            lo, hi = world.extent(self.scene, EDGE_MARGIN)
+            lo, hi = terrain.extent(self.scene, EDGE_MARGIN)
             self.x = min(hi, max(lo, self.x + f[0] * self.speed * SPEED * self.boost * dt))
             self.z = min(hi, max(lo, self.z + f[2] * self.speed * SPEED * self.boost * dt))
         gait = max(abs(self.speed) * self.boost, TURN_GAIT * abs(inp.move_x))
@@ -277,15 +277,15 @@ class Player:
         for _ in range(2):  # twice, in case pushing out of one foot lands inside another
             for cx, cz, radius in boss.feet():
                 self.x, self.z = collide.push_out(self.x, self.z, cx, cz, radius)
-        self.y = world.terrain_height(self.scene, self.x, self.z)
+        self.y = terrain.terrain_height(self.scene, self.x, self.z)
 
     def _fall(self, dt):
-        lo, hi = world.extent(self.scene, EDGE_MARGIN)
+        lo, hi = terrain.extent(self.scene, EDGE_MARGIN)
         self.x = min(hi, max(lo, self.x + self.vx * dt))
         self.z = min(hi, max(lo, self.z + self.vz * dt))
         self.vy -= GRAVITY * dt
         self.y += self.vy * dt
-        ground = world.terrain_height(self.scene, self.x, self.z)
+        ground = terrain.terrain_height(self.scene, self.x, self.z)
         if self.y <= ground:
             self.y, self.airborne = ground, False
             self.vx = self.vy = self.vz = 0.0
@@ -439,7 +439,7 @@ class Player:
         if self.mounted:
             return screen.Rig(HORSE_ID, *self._horse_anim(), x=self.x, y=self.y, z=self.z, yaw=self.yaw, char_light=True)
         if self.airborne:  # time to land under gravity, from y + vy t - g t^2 / 2 = ground
-            drop = self.y - world.terrain_height(self.scene, self.x, self.z)
+            drop = self.y - terrain.terrain_height(self.scene, self.x, self.z)
             t = (self.vy + math.sqrt(self.vy * self.vy + 2 * GRAVITY * max(drop, 0.0))) / GRAVITY
             if t < FADE_IN:
                 ground = self.y - drop
@@ -450,7 +450,7 @@ class Player:
             d = speed * SPEED * self.loose_time
             x, z = x + math.sin(yaw) * d, z + math.cos(yaw) * d
             return screen.Rig(HORSE_ID, HORSE_ANIM["gallop"], int(self.loose_time * GALLOP_RATE) & 255,
-                           x=x, y=world.terrain_height(self.scene, x, z), z=z, yaw=yaw, char_light=True,
+                           x=x, y=terrain.terrain_height(self.scene, x, z), z=z, yaw=yaw, char_light=True,
                            fade=self.loose_time / FADE_OUT)
         return None
 

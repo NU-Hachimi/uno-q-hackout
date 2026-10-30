@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-# Megalith as an Alia Pad cart, drawn by alia-engine (python/alia_view.py). The engine is
+# Megalith as an Alia Pad cart, drawn by alia-engine (python/view.py). The engine is
 # built from a checkout next to alia-pad; the board build cross-compiles with alia-pad's sysroot.
 ALIA_ENGINE ?= $(HOME)/Projects/alia-engine
 ALIA_PAD ?= $(HOME)/Projects/alia-pad

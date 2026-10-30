@@ -16,23 +16,26 @@
 
 ## 2. 现在每个文件是什么
 
-| 文件 | 是什么 | 去向 |
-|---|---|---|
-| `main.py` | 入口：一个 `Game` 类交给 `alia_engine.run`；`fixed_update` 里跑 `game.step`，`render` 里画 | 保留，更薄 |
-| `game.py` | 一局的状态机（Ready → Intro → Fight ⇄ Menu → Execute → Win/Lose），每步调度玩家、BOSS、相机、瞄准，最后拼出 `Frame` | 保留；"拼 Frame"那部分去掉 |
-| `player.py`、`boss.py`、`finisher.py` | 玩法实体：骑行、射击、钩锁；BOSS 的 AI 和部件；处决演出。BOSS、马和骑手都是它们自己持有的引擎 rig（第 5、5b 步） | 保留，直接持有引擎里的物体 |
-| `camera.py`、`aim.py`、`controls.py` | 相机怎么跟、瞄准吸附、输入映射 | 保留（玩法逻辑）；相机结果直接写引擎的 `world.camera`，输入直接读引擎 |
-| `world.py` | **Megalith 自己的世界**：地形高度、竞技场、石头散布、昼夜循环。和引擎的 `engine.world` 无关，名字撞了 | 改名 `terrain.py` |
-| `rig.py` | rig 姿态（Python 参考实现） | 只剩测试和 `rig_build.py` 的黄金数据在用；玩法不再用（第 5b 步） |
-| `collide.py` | 碰撞的**分类**：BODY / PART / HOOK 层、`Collider`（骨骼号、槽号）、`push_out`。形状和射线在引擎里 | 保留（玩法逻辑） |
-| `assets.py` | 把 `gen/rigs.apak` 加载进引擎一次 | 保留 |
-| `screen.py` | 每一步给画面的数据：Camera、Obj、Hud、Hook、Rig、Frame（原来 `g3d.py` 里的记录，打包格式随 MCU 去掉了） | 保留，第 8 步余下的部分再看要不要并进 `hud.py` |
-| `alia_view.py` | 翻译层：Frame → 引擎；Look 调色、地形烘焙、绳子、HUD 排版 | 拆成 `look.py`（调色、天色）和 `hud.py`（HUD），其余删掉 |
-| `tilt_config.py`、`preview.py` | 手感参数（名字还是"倾斜"）、摇杆死区 | 合并成 `tuning.py` |
-| `audio.py` | 放哪首音乐、多大声（引擎的混音器在放，第 7 步） | 保留 |
-| `tools/mesh_build.py`、`rig_build.py`、`audio_build.py` | PC 上把 `assets/` 烘焙成 `python/gen/` | 保留；输出改成引擎的资源包（`meshes.apak` 已经是） |
-| `tools/snapshot.py`（`--alia`）、`snapshot_compare.py`、`cart_art.py`、`cart_build.sh` | 44 张关键帧快照（游戏状态 + 截图，回归）、比较两次快照、卡带美术、卡带打包 | 保留 |
-| ~~`sketch/`~~、~~`g3d.py`~~、~~`tests/cpp/`~~、~~`app.yaml`~~ | MCU 渲染器、通信协议、它们的测试、App Lab 的清单 | 第 8 步去掉了（原版在 `main` 分支） |
+| 文件 | 是什么 |
+|---|---|
+| `main.py` | 入口：`Megalith` 类交给 `alia_engine.run`；输入动作表（`ACTIONS`）；每个逻辑步跑 `game.step`、同步画面、放音乐和音效 |
+| `game.py` | 一局的状态机（Ready → Intro → Fight ⇄ Menu → Execute → Win/Lose），调度玩家、BOSS、相机、瞄准，拼出这一步的 `Frame`，收集声音事件 |
+| `player.py`、`boss.py`、`finisher.py` | 玩法实体：骑行、射击、钩锁；BOSS 的 AI 和部件；处决演出。BOSS、马和骑手都是它们自己持有的引擎 rig，粒子发射器归 Player |
+| `camera.py`、`aim.py`、`controls.py` | 相机怎么跟、瞄准吸附、输入（按键位、`RawInput`） |
+| `collide.py` | 碰撞的分类（BODY / PART / HOOK 层、`Collider`、`push_out`）；形状和射线在引擎里 |
+| `terrain.py` | 地形、竞技场、石头散布、昼夜（原来的 `world.py`，改名是为了不和引擎的 `engine.world` 撞名） |
+| `tuning.py` | 手感参数：视角、转向、镜头跟随、摇杆死区（原来的 `tilt_config.py` + 比赛模板的 `preview.py`） |
+| `screen.py` | 每一步给画面的数据：Camera、Obj、Hud、Hook、Rig、Frame |
+| `view.py` | 画面里游戏对象自己不管的部分：地形网格、石头、Frame 里随步来去的物体（子弹、钩头、尘环、处决的闪光）、绳子、相机 |
+| `look.py` | Look 调色、调色板、天色、雾、太阳和角色光、受伤叠色 |
+| `hud.py` | HUD 排版（唯一还每帧画的东西） |
+| `assets.py`、`effects.py` | 一次性加载网格、rig、粒子模板；三个粒子模板 |
+| `audio.py`、`sfx.py` | 音乐（放哪首、多大声、从哪儿循环）；音效（按相机的位置给声像和远近） |
+| `rig.py` | rig 姿态的参考实现：只剩测试和 `rig_build.py` 的黄金数据在用 |
+| `tools/mesh_build.py`、`rig_build.py`、`sfx_build.py`、`audio_build.py` | PC 上把 `assets/` 烘焙成 `python/gen/`、合成音效、渲染音乐 |
+| `tools/snapshot.py`（`--alia`）、`snapshot_compare.py`、`cart_art.py`、`cart_build.sh` | 44 张关键帧快照（游戏状态 + 截图）、比较两次快照、卡带美术、卡带打包 |
+
+MCU 那条路（`sketch/`、`g3d.py`、`tests/cpp/`、`app.yaml`）第 8 步去掉了，原版在 `main` 分支。
 
 ## 3. 目标结构（E4 第 8 步）
 
@@ -68,7 +71,7 @@ tuning.py     手感参数（原 tilt_config.py + preview.py）
 | 6 粒子 | 纯视觉的效果换成引擎的粒子（`effects.py` 的三个模板，数字和原来 Python 里的一样）：子弹落点的火花（`hit`，按子弹的颜色）、打碎部件的碎片（`debris`，按部件的颜色）、处决时手上的火花（`orbs`，`time_scale` 跟着慢动作和打击停顿）。发射器归 Player。去掉了 `Spark`、`MAX_SPARKS = 4` 和处决的 `orbs` 列表；尘环和曳光弹有玩法意义，仍然是 Frame 里的物体。`assets.py` 现在也加载网格和粒子模板（`alia_view.py` 从那里拿网格）。快照工具用 `World.begin_step / end_step` 包住每一步，粒子在截图里也会动、会消失。效果：以前 MCU 的物体上限把处决时的碎片挤掉了，现在弱点碎掉时能看到碎片（快照 `25_execute_shatter`） | ✅ |
 | 7 系统 | 按键映射用引擎的动作映射：`main.py` 的 `ACTIONS` 表（confirm / shoot / hook / stick / pause 五个按钮动作，ride / look 两个摇杆）`load` 进 `engine.actions`，`raw_input()` 从动作拼出游戏读的 `RawInput`（`tests/test_main.py`）✅。`audio.py` 换成引擎的混音器：不再起 `aplay` 子进程、不再在 Python 线程里混音和淡入淡出，只告诉引擎放哪首、多大声、从哪儿循环（`music.json`）；"每步调用、同一首只改音量、放完的短曲不重放"的行为不变，换曲从"先淡出再开始"变成交叉淡化 | ✅ |
 | 6b 清理 | `rig.py` 回到简单好读的参考实现：去掉了为板上性能加的姿态缓存、部件槽缓存和手工展开的 3×3 运算（生成的黄金文件逐字节不变）。引擎对照固定的黄金文件 `tests/golden/rig_*.json`（每块骨骼的变换、每个部件槽在生成的 rig 上的位置，差在 2×10⁻⁵ 以内），不再现算 `rig.py`。顺手修了一个偶发失败的测试：`test_boss.py` 的 BOSS 没给随机种子，攻击节奏每次不同 | ✅ |
-| 8 收尾（进行中） | **MCU 那条路整个去掉（✅ 2026-10-30）**：`sketch/`、`tests/cpp/`、`scripts/flash.sh`、`app.yaml`、`g3d.py`、两个生成工具里的 C 头文件、快照里的 `.frame` / `.sky` / `scene.bin`；回归先换成了游戏状态的转储（`snapshot_compare.py`），去掉以后 44 张关键帧状态和截图全部一致；`g3d.py` 的数据记录搬进 `screen.py`、`controls.py`、`world.py`。原来的计划：（原版留在 `main` 分支）：`sketch/`、`tests/cpp/`、`scripts/flash.sh`、`mesh_build.py` / `rig_build.py` 生成的 C 头文件、`g3d.py`（不只是协议：`RawInput`、`Camera`、`Obj`、`Hud`、按键常量是玩法和画面之间传的数据类型，要换成游戏自己的类型或者直接读引擎的输入）、`Frame`、快照里的 `.frame` 包。**先换回归手段**：`.frame` 包逐字节一致是现在最严的检查，删掉之前 `snapshot.py` 改成每个关键帧转储一份游戏状态（PC、BOSS、相机、物体，JSON），比对它和截图。然后拆分 `alia_view.py`，改名（`world.py` → `terrain.py` 等）。`retroarch/` 和 Megalith 无关（比赛的另一个演示），留着 | |
+| 8 收尾（进行中；文件结构 ✅：`alia_view.py` 拆成 `view.py`、`look.py`、`hud.py`，`world.py` → `terrain.py`，`tilt_config.py` + `preview.py` → `tuning.py`，快照 44 张全部一致） | **MCU 那条路整个去掉（✅ 2026-10-30）**：`sketch/`、`tests/cpp/`、`scripts/flash.sh`、`app.yaml`、`g3d.py`、两个生成工具里的 C 头文件、快照里的 `.frame` / `.sky` / `scene.bin`；回归先换成了游戏状态的转储（`snapshot_compare.py`），去掉以后 44 张关键帧状态和截图全部一致；`g3d.py` 的数据记录搬进 `screen.py`、`controls.py`、`world.py`。原来的计划：（原版留在 `main` 分支）：`sketch/`、`tests/cpp/`、`scripts/flash.sh`、`mesh_build.py` / `rig_build.py` 生成的 C 头文件、`g3d.py`（不只是协议：`RawInput`、`Camera`、`Obj`、`Hud`、按键常量是玩法和画面之间传的数据类型，要换成游戏自己的类型或者直接读引擎的输入）、`Frame`、快照里的 `.frame` 包。**先换回归手段**：`.frame` 包逐字节一致是现在最严的检查，删掉之前 `snapshot.py` 改成每个关键帧转储一份游戏状态（PC、BOSS、相机、物体，JSON），比对它和截图。然后拆分 `alia_view.py`，改名（`world.py` → `terrain.py` 等）。`retroarch/` 和 Megalith 无关（比赛的另一个演示），留着 | |
 
 ## 5. 怎么验收
 

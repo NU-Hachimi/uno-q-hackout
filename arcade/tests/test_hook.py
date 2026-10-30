@@ -5,7 +5,7 @@ import aim
 import camera
 import controls
 import screen
-import world
+import terrain
 from arena import W
 from boss import Boss, pick_parts
 from controls import Input
@@ -17,7 +17,7 @@ DT = 0.05
 
 
 def setup(seed=3):
-    scene = world.make_scene(1)
+    scene = terrain.make_scene(1)
     scene.slot_variants = pick_parts(random.Random(seed))
     boss = Boss(scene, W, random.Random(0))
     return scene, boss
@@ -83,7 +83,7 @@ def test_only_the_back_and_the_brow_take_the_hook():
 
 
 def test_on_the_brow_the_view_tilts_further_down_and_eases_back_after():
-    from tilt_config import HOOKED_MIN_PITCH_DEG, MIN_PITCH_DEG
+    from tuning import HOOKED_MIN_PITCH_DEG, MIN_PITCH_DEG
     cam = camera.ThirdPersonCamera(0.0)
     down = Input(pitch_rate=-math.radians(40))
     for _ in range(60):
@@ -108,7 +108,7 @@ def test_letting_go_falls_to_the_ground():
     assert pc.hook is None and pc.airborne
     for _ in range(60):
         step(pc, boss)
-    assert not pc.airborne and abs(pc.y - world.terrain_height(scene, pc.x, pc.z)) < 1e-9
+    assert not pc.airborne and abs(pc.y - terrain.terrain_height(scene, pc.x, pc.z)) < 1e-9
 
 
 def test_a_miss_comes_back():
@@ -158,7 +158,7 @@ def hook_on_brow(pc, boss):
 def test_finisher_prompts_then_b_plays_it_and_wins():
     from finisher import EXECUTE_SECONDS, HIT_STOP, SLOW
     from game import EXECUTE, MSG_FINISH
-    game = Game(world.make_scene(1), W, seed=1)
+    game = Game(terrain.make_scene(1), W, seed=1)
     game.step(raw(controls.BTN_A), DT)
     game.step(raw(controls.BTN_A), DT)  # skip the intro
     boss, pc = game.boss, game.player
@@ -189,12 +189,12 @@ def test_finisher_prompts_then_b_plays_it_and_wins():
     assert abs(hit - expect_hit) < 2 * DT and abs(shattered - expect_shatter) < 2 * DT
     assert game.state == WIN and frame.hud.msg == 13
     assert boss.fade == 1.0  # sank into the fog
-    assert pc.hook is None and not pc.airborne and pc.y == world.terrain_height(game.scene, pc.x, pc.z)  # back in the saddle
+    assert pc.hook is None and not pc.airborne and pc.y == terrain.terrain_height(game.scene, pc.x, pc.z)  # back in the saddle
     game.step(raw(controls.BTN_A), DT)
     assert game.state == READY
 
 def test_losing_all_health_loses():
-    game = Game(world.make_scene(1), W, seed=1)
+    game = Game(terrain.make_scene(1), W, seed=1)
     game.step(raw(controls.BTN_A), DT)
     game.step(raw(controls.BTN_A), DT)  # skip the intro
     game.player.hp = 0

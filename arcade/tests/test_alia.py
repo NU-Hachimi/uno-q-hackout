@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import assets
-import world
+import terrain
 from arena import ENGINE, W
 from gen.rigs import RIGS
 
@@ -41,8 +41,8 @@ def test_engine_poses_match_the_golden_files():
 
 
 def test_engine_ground_matches_terrain_height():
-    scene = world.make_scene(1)
-    world.set_ground(W, scene)
+    scene = terrain.make_scene(1)
+    terrain.set_ground(W, scene)
     for x in range(-130, 131, 7):
         for z in range(-130, 131, 11):
-            assert abs(W.ground_height(x, z) - world.terrain_height(scene, x, z)) < 1e-4
+            assert abs(W.ground_height(x, z) - terrain.terrain_height(scene, x, z)) < 1e-4

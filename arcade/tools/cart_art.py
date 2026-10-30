@@ -18,8 +18,8 @@ import alia_engine as ae  # noqa: E402
 import assets  # noqa: E402
 import controls  # noqa: E402
 import screen  # noqa: E402
-import world  # noqa: E402
-from alia_view import View  # noqa: E402
+import terrain  # noqa: E402
+from view import View  # noqa: E402
 from game import Game  # noqa: E402
 
 DT = 1 / 30
@@ -54,7 +54,7 @@ def look_at(game, point, distance, side=0.0):
     p = game.player
     heading = math.atan2(point[0] - p.x, point[2] - p.z) + side
     p.x, p.z = point[0] - math.sin(heading) * distance, point[2] - math.cos(heading) * distance
-    p.y = world.terrain_height(game.scene, p.x, p.z)
+    p.y = terrain.terrain_height(game.scene, p.x, p.z)
     game.camera.yaw = p.yaw = heading
     game.camera.pitch = math.atan2(point[1] - (p.y + 2.5), distance + 6)
 
@@ -65,7 +65,7 @@ def shoot(engine, view, game, path, hud=True, steps=1, inputs=raw):
         frame = step(engine, game, inputs())
     if not hud:
         frame.flags |= screen.FLAG_NO_HUD
-    view.set_sky(*world.sky_at(game.day))
+    view.set_sky(*terrain.sky_at(game.day))
     view.update(frame, game.player.hand())
     view.draw(frame)
     engine.end_frame()
@@ -75,7 +75,7 @@ def shoot(engine, view, game, path, hud=True, steps=1, inputs=raw):
 def main():
     out = Path(sys.argv[1])
     (out / "screenshots").mkdir(parents=True, exist_ok=True)
-    scene = world.make_scene(seed=1)
+    scene = terrain.make_scene(seed=1)
 
     engine = ae.Engine(headless=True, size=(1280, 720))
     view = View(engine, scene)
@@ -86,7 +86,7 @@ def main():
     look_at(game, (boss.x, boss.y + 7, boss.z), 24, side=0.5)
     shoot(engine, view, game, out / "cover.png", hud=False)
     # Background (behind the Shell while the cart is selected): dusk, further out.
-    game = fight(engine, scene, day=world.DAY_HOLD + world.DAY_BLEND + 6.0, before=game)
+    game = fight(engine, scene, day=terrain.DAY_HOLD + terrain.DAY_BLEND + 6.0, before=game)
     look_at(game, (boss.x, boss.y + 6, boss.z), 44, side=-0.4)
     shoot(engine, view, game, out / "background.png", hud=False)
     # Screenshots with the HUD: riding in, aiming at a part, at night.
@@ -95,7 +95,7 @@ def main():
     part = next(c for c in game.boss.colliders() if c.slot == game.boss.parts[0]).centre()
     look_at(game, part, 14)
     shoot(engine, view, game, out / "screenshots" / "2_aim.png")
-    game = fight(engine, scene, day=2 * (world.DAY_HOLD + world.DAY_BLEND) + 6.0, before=game)
+    game = fight(engine, scene, day=2 * (terrain.DAY_HOLD + terrain.DAY_BLEND) + 6.0, before=game)
     look_at(game, (game.boss.x, game.boss.y + 5, game.boss.z), 30, side=0.3)
     shoot(engine, view, game, out / "screenshots" / "3_night.png")
     engine.close()

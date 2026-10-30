@@ -1,4 +1,4 @@
-"""Megalith on Alia Pad: game logic in Python, drawn by alia-engine (alia_view.py).
+"""Megalith on Alia Pad: game logic in Python, drawn by alia-engine (view.py, look.py, hud.py).
 
     python3 main.py            window: keyboard or gamepad (alia_engine.Input)
     python3 main.py --demo     scripted input instead of the controller
@@ -27,8 +27,8 @@ import assets  # noqa: E402
 import audio  # noqa: E402
 import sfx  # noqa: E402
 import controls  # noqa: E402
-import world  # noqa: E402
-from alia_view import View  # noqa: E402
+import terrain  # noqa: E402
+from view import View  # noqa: E402
 from game import Game  # noqa: E402
 
 # The controls as alia-engine input actions (its docs/api.md §6). Alia Pad buttons are positional; the labels
@@ -72,7 +72,7 @@ class Megalith:
 
     def init(self, engine):
         engine.actions.load(ACTIONS)
-        self.scene = world.make_scene(seed=1, look=world.TIME_OF_DAY[0])
+        self.scene = terrain.make_scene(seed=1, look=terrain.TIME_OF_DAY[0])
         self.view = View(engine, self.scene)  # first: it loads the meshes the rigs are drawn with
         assets.load(engine)
         self.game = Game(self.scene, engine.world)
@@ -88,7 +88,7 @@ class Megalith:
         self.frame = self.game.step(raw, dt)
         self.view.update(self.frame, self.game.player.hand())  # the world follows the logic; the engine interpolates between steps
         if self.game.sky_update(dt):
-            self.view.set_sky(*world.sky_at(self.game.day))
+            self.view.set_sky(*terrain.sky_at(self.game.day))
         self.music.play(*self.game.music())
         self.effects.play(self.game.sounds, self.frame.camera)
         self.seq = (self.seq + 1) & 0xFF

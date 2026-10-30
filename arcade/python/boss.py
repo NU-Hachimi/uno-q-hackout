@@ -22,7 +22,7 @@ import alia_engine as ae
 import assets
 import collide
 import screen
-import world
+import terrain
 from gen import mesh_ids, palette
 from gen.rigs import RIGS
 
@@ -106,7 +106,7 @@ class Boss:
         self.anims = anim_ids(self.rig)
         self.variants = list(scene.slot_variants)
         self.x, self.z = 0.0, 0.0
-        self.y = world.terrain_height(scene, self.x, self.z)
+        self.y = terrain.terrain_height(scene, self.x, self.z)
         self.yaw = math.pi  # facing -Z, towards the PC's spawn
         self.anim = self.anims["idle"]
         self.anim_time = 0.0
@@ -253,11 +253,11 @@ class Boss:
         """Charge straight along the locked heading; running into the PC hurts it once."""
         step = min(CHARGE_SPEED * dt, self.charge_left)
         x, z = self.x + math.sin(self.yaw) * step, self.z + math.cos(self.yaw) * step
-        lo, hi = world.extent(self.scene, CHARGE_EDGE)
+        lo, hi = terrain.extent(self.scene, CHARGE_EDGE)
         inside = lo <= x <= hi and lo <= z <= hi
         if inside:
             self.x, self.z = x, z
-            self.y = world.terrain_height(self.scene, x, z)
+            self.y = terrain.terrain_height(self.scene, x, z)
             self.charge_left -= step
             self._cache = None
         if not self.charge_hit:
@@ -281,7 +281,7 @@ class Boss:
                     player.hurt(event.get("dmg", 1))
             elif kind == "shockwave":
                 x, _, z = self.bone_position(event["bone_index"])
-                self.waves.append([x, world.terrain_height(self.scene, x, z), z, 0.0, event["speed"],
+                self.waves.append([x, terrain.terrain_height(self.scene, x, z), z, 0.0, event["speed"],
                                    event.get("dmg", 1)])
                 self.sounds.append(("stomp", (x, self.waves[-1][1], z)))
             elif kind == "throw" and player.on_boss:
