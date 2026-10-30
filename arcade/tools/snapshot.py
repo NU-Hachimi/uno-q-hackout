@@ -14,6 +14,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python"))
 
+import dataclasses  # noqa: E402
+import json  # noqa: E402
 import math  # noqa: E402
 
 import alia_engine  # noqa: E402
@@ -31,6 +33,35 @@ NEUTRAL_G = (0, 0, 1000)  # mg; unused since the right stick replaced tilt
 def raw(jx=0, jy=0, held=0, pressed=0, connected=7, accel=NEUTRAL_G, rx=0, ry=0):
     # Stick values in raw units with preview.py's INVERT_Y: pushing forward reads positive jy.
     return g3d.RawInput(0, connected, held, pressed, jx, jy, *accel, 0, 0, 0, 0, rx, ry)
+
+
+def _rounded(v):
+    if isinstance(v, float):
+        return round(v, 4) + 0.0  # no -0.0
+    if isinstance(v, dict):
+        return {k: _rounded(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_rounded(x) for x in v]
+    return v
+
+
+def state_of(game, frame):
+    """The game at a keyframe, as plain data (NAME.state.json): what the Frame carries (camera, HUD, objects,
+    rigs, hook) and what it doesn't (the PC, the boss, the particles, the sounds). It replaces the .frame packets
+    as the regression check once the MCU path goes (docs/alia-port.md, step 8); floats to 4 decimals."""
+    p, b = game.player, game.boss
+    return _rounded({
+        "game": {"state": game.state, "time": game.time, "sounds": [name for name, _ in game.sounds]},
+        "frame": {"camera": dataclasses.asdict(frame.camera), "hud": dataclasses.asdict(frame.hud),
+                  "objects": [dataclasses.asdict(o) for o in frame.objects], "hook": dataclasses.asdict(frame.hook),
+                  "rigs": [dataclasses.asdict(r) if r else None for r in frame.rigs], "flags": frame.flags},
+        "player": {"pos": (p.x, p.y, p.z), "yaw": p.yaw, "hp": p.hp, "hook": p.hook, "airborne": p.airborne,
+                   "shots": p.shots, "tracers": len(p.tracers),
+                   "particles": {"hits": p.hits.count, "debris": p.debris_fx.count, "orbs": p.orbs.count}},
+        "boss": {"pos": (b.x, b.y, b.z), "yaw": b.yaw, "state": b.state, "anim": b.anim, "phase": b.phase(),
+                 "hp": {str(k): v for k, v in sorted(b.hp.items())}, "alive": b.alive, "fade": b.fade,
+                 "waves": [list(w[:4]) for w in b.waves]},
+    })
 
 
 def write_scene(path, scene):
@@ -72,6 +103,7 @@ def main():
 
     def save(name, frame):
         (out / f"{name}.frame").write_bytes(frame.pack(seq))
+        (out / f"{name}.state.json").write_text(json.dumps(state_of(game, frame), indent=1, sort_keys=True) + "\n")
         if view:
             view.update(frame, game.player.hand())
             view.draw(frame)

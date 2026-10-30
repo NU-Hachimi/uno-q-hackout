@@ -73,5 +73,5 @@ tuning.py     手感参数（原 tilt_config.py + preview.py）
 ## 5. 怎么验收
 
 - `make test`：82 个玩法测试，在无头的 alia-engine 里跑（先编译 `build/engine-pc`；BOSS 的 rig 和碰撞体在引擎的世界里）。
-- `tools/snapshot.py OUT --alia`：44 张关键帧，和上一版逐像素比对。画面确实会变的步骤（插值让运动更平滑、C++ 和 Python 的浮点差异）改成"关掉插值时一致，或者只差在边缘像素"，并在提交说明里写明差了多少。
+- `tools/snapshot.py OUT --alia`：44 张关键帧，每张都有截图（`.alia.png`）、游戏状态（`.state.json`：Frame 里的相机、HUD、物体、rig、钩子，加上 PC、BOSS、粒子数、这一步的声音事件，浮点保留 4 位）和 MCU 的帧包（`.frame`，第 8 步删掉）。`python3 tools/snapshot_compare.py 旧 新` 逐张比较：状态要相等，截图超过 8 级的像素要为 0（同一份代码跑两次逐字节一致）。画面确实会变的步骤（插值让运动更平滑、C++ 和 Python 的浮点差异）改成"关掉插值时一致，或者只差在边缘像素"，并在提交说明里写明差了多少。
 - 板上：`make cart install launch`，`--stats` 看 `update_ms`、`render_ms`。
