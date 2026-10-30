@@ -108,6 +108,7 @@ class Game:
         self.time = 0.0
         self.aim = None
         self.finisher = None
+        self.sounds = []
         self.shake, self.shake_time = 0.0, 0.0
 
     def step(self, raw, dt):
@@ -138,6 +139,8 @@ class Game:
             self.restart()
         self.boss.present()
         self.player.present()
+        self.sounds = self.boss.sounds + self.player.sounds  # since the last step, for sfx.py
+        self.boss.sounds, self.player.sounds = [], []
         return self._frame()
 
     def close(self):

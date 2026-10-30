@@ -128,6 +128,7 @@ class Boss:
         self.alive = sum(1 << i for i, v in enumerate(self.variants) if v)
         self.hit_slot, self.hit_timer = 0xFF, 0.0
         self.broken = []   # (slot, world position, tint) broken since the game last read it, for debris
+        self.sounds = []   # (name, position) this step, for sfx.py; Game.step clears and collects them
         self.shake = 0.0   # camera shake amplitude (m) from the latest event, read and cleared by the game
         self.waves = []    # spreading shockwaves: [x, y, z, radius, speed, damage]
         self.fade = 0.0    # 0..1 extra blend into the fog (1 = not drawn), for the intro and the finisher
@@ -282,6 +283,7 @@ class Boss:
                 x, _, z = self.bone_position(event["bone_index"])
                 self.waves.append([x, world.terrain_height(self.scene, x, z), z, 0.0, event["speed"],
                                    event.get("dmg", 1)])
+                self.sounds.append(("stomp", (x, self.waves[-1][1], z)))
             elif kind == "throw" and player.on_boss:
                 dx, dz = player.x - self.x, player.z - self.z
                 dist = math.hypot(dx, dz) or 1.0
@@ -415,6 +417,7 @@ class Boss:
         self._cache = None
         mesh = self.rig["slots"][slot]["variants"][self.variants[slot]] or ""
         self.broken.append((slot, self.position_of(part), part_tint(mesh)))
+        self.sounds.append(("break", self.broken[-1][1]))
 
     def begin_execution(self):
         """The finisher starts: stop attacking and drop pending shockwaves."""

@@ -93,6 +93,7 @@ class Player:
         self.hp = HP_MAX
         self.cooldown = 0.0
         self.tracers = []
+        self.sounds = []       # (name, position) this step, for sfx.py; Game.step clears and collects them
         self.hook = None       # FLYING / RETURNING / PULLING / HOOKED, or None
         self.hook_anchor = None  # the boss's hook point node the hook holds (it moves with the bone), if any
         self.hook_from = (0.0, 0.0, 0.0)  # hand position when fired
@@ -303,6 +304,7 @@ class Player:
         self.hook_head = self.hook_from
         self.hook_time = 0.0
         self.hook = FLYING
+        self.sounds.append(("hook_fire", self.hook_from))
         if aim.hook is not None:
             self.hook_anchor = aim.hook.collider.node  # rides the bone, so the hook lands on the brow wherever it moved
             self.hook_to = aim.hook.point
@@ -332,6 +334,7 @@ class Player:
                     self.loose, self.loose_time = (self.x, self.y, self.z, self.yaw, max(self.speed, 0.6)), 0.0
                     self.x, self.y, self.z = self._rider_origin()
                     self.hook = PULLING
+                    self.sounds.append(("hook_catch", self.hook_to))
                 else:
                     self.hook, self.hook_time = RETURNING, 0.0
         elif self.hook == RETURNING:
@@ -371,6 +374,7 @@ class Player:
         self.vx, self.vy, self.vz = away[0] * speed, up, away[1] * speed
         self.hp = max(0, self.hp - damage)
         self.invulnerable, self.hurt_flash, self.since_hit = INVULNERABLE, HURT_FLASH, 0.0
+        self.sounds.append(("hurt", (self.x, self.y, self.z)))
         return True
 
     def hurt(self, damage):
@@ -379,6 +383,7 @@ class Player:
             return False
         self.hp = max(0, self.hp - damage)
         self.invulnerable, self.hurt_flash, self.since_hit = INVULNERABLE, HURT_FLASH, 0.0
+        self.sounds.append(("hurt", (self.x, self.y, self.z)))
         return True
 
     def _shoot(self, aim, boss):
@@ -404,6 +409,7 @@ class Player:
         self.tracers.append(Tracer(x, y, z, v[0] * speed, v[1] * speed, v[2] * speed, dist / TRACER_SPEED,
                                    slot, 2 if self.hooked else 1, self.hooked, tint))
         self.cooldown = SHOT_COOLDOWN
+        self.sounds.append(("shot", (x, y, z)))
         self.shots += 1
         self.since_shot = 0.0
 
@@ -420,6 +426,7 @@ class Player:
                 boss.damage(t.slot, t.damage, t.hooked)
             if t.tint:
                 self.hits.burst(1, at=(t.x, t.y, t.z), tint=t.tint)
+                self.sounds.append(("hit" if t.slot >= 0 else "ground", (t.x, t.y, t.z)))  # sparks off a part, else dust
         self.tracers = flying
 
     def debris(self, pos, tint):

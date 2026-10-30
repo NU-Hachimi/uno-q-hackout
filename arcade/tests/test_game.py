@@ -248,3 +248,29 @@ def test_music_follows_the_round():
     game.player.hp = 0
     game.step(raw(), DT)
     assert game.state == "lose" and game.music() == ("jingle_defeat", 1.0)
+
+
+def test_shots_hits_and_breaks_become_sound_events():
+    game = started()
+    game.step(raw(pressed=g3d.BTN_B), DT)
+    assert [n for n, _ in game.sounds] == ["shot"]
+    for _ in range(20):  # the tracer lands
+        game.step(raw(), DT)
+    assert game.sounds == [] or all(n in ("hit", "ground") for n, _ in game.sounds)
+    boss = game.boss
+    boss.damage(boss.parts[0], 99)
+    game.step(raw(), DT)
+    names = [n for n, _ in game.sounds]
+    assert "break" in names
+
+
+def test_effects_play_through_the_mixer():
+    import sfx
+    from arena import ENGINE
+    fx = sfx.Effects(ENGINE)
+    assert set(fx.sounds) == set(sfx.LEVELS)  # every sound is built (tools/sfx_build.py)
+    view = g3d.Camera(0, 2, 0, yaw=0.0)
+    fx.play([("shot", (0, 2, 5)), ("stomp", (500, 0, 0))], view)  # the stomp is past FAR: not heard
+    assert ENGINE.audio.voices == 1
+    ENGINE.audio.mix(48000)
+    assert ENGINE.audio.voices == 0

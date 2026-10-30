@@ -12,7 +12,7 @@ mkdir -p "$out/content"
 cp cart/cart.toml "$out/"
 # The game: every module, the generated tables and mesh pack, the music.
 cp python/*.py "$out/content/"
-cp -r python/gen python/music "$out/content/"
+cp -r python/gen python/music python/sfx "$out/content/"
 find "$out/content" -name __pycache__ -prune -exec rm -rf {} +
 # alia-engine ships inside the cart: content/python/alia_engine.abi3.so (main.py puts it on sys.path).
 cmake --install "$engine" --prefix "$out/content" >/dev/null

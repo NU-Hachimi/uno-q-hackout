@@ -25,6 +25,7 @@ import alia_engine as ae  # noqa: E402
 
 import assets  # noqa: E402
 import audio  # noqa: E402
+import sfx  # noqa: E402
 import g3d  # noqa: E402
 import world  # noqa: E402
 from alia_view import View  # noqa: E402
@@ -49,7 +50,8 @@ def raw_input(actions, seq):
 
 
 class DemoInput:
-    """Scripted input: A to start the ride-in, A to skip it, then ride and look."""
+    """Scripted input: A to start the ride-in, A to skip it, then ride and look, shooting in bursts (so a
+    --demo run exercises the effects and the mixer too)."""
 
     def __init__(self):
         self.step = 0
@@ -58,7 +60,8 @@ class DemoInput:
         self.step += 1
         pressed = g3d.BTN_A if self.step in (5, 10) else 0
         jy, rx = (60, 40) if self.step > 20 else (0, 0)
-        return g3d.RawInput(seq, 7, 0, pressed, 0, jy, 0, 0, 1000, 0, 0, 0, 0, rx, 0)
+        held = g3d.BTN_B if self.step > 20 and (self.step // 45) % 2 else 0
+        return g3d.RawInput(seq, 7, held, pressed, 0, jy, 0, 0, 1000, 0, 0, 0, 0, rx, 0)
 
 
 class Megalith:
@@ -74,6 +77,7 @@ class Megalith:
         assets.load(engine)
         self.game = Game(self.scene, engine.world)
         self.music = audio.Music(engine)
+        self.effects = sfx.Effects(engine)
         self.seq = 0
         self.frame = self.game.step(None, 0.0)  # something to draw before the first step
         self.view.update(self.frame, self.game.player.hand())
@@ -86,6 +90,7 @@ class Megalith:
         if self.game.sky_update(dt):
             self.view.set_sky(*world.sky_at(self.game.day))
         self.music.play(*self.game.music())
+        self.effects.play(self.game.sounds, self.frame.camera)
         self.seq = (self.seq + 1) & 0xFF
 
     def render(self, engine, alpha):

@@ -129,6 +129,7 @@ class Finisher:
         elif kind == "sparks":
             self._burst(event.get("n", 8))
             if event["phase"] == self.hit_phase:
+                self.game.player.sounds.append(("hit", self._hand()))
                 self.frozen, self.flash = HIT_STOP, FLASH_SECONDS
                 boss.hit_slot, boss.hit_timer = boss.weak, HIT_STOP + 0.1
             else:  # the weak point shatters
