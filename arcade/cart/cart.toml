@@ -4,12 +4,14 @@
 [cart]
 id          = "com.nuhachimi.megalith"
 title       = "Megalith"
-title_zh    = "巨构"
 version     = "1.1.0"
 publisher   = "NU Hachimi"
 description = """A low-poly boss fight in the spirit of Shadow of the Colossus. Ride around a giant \
 stone moose, shoot off its leg armor and back crystals, grapple onto its back or brow, and finish it.
 Left stick rides, right stick looks, B shoots, X fires the hook, Start pauses."""
+
+[locale.zh]
+title = "巨构"           # the Chinese title (the game itself isn't localised yet: its text stays English)
 
 [runtime]
 type  = "python"
