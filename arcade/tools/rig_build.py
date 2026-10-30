@@ -6,10 +6,15 @@
 
 The golden file holds bone and slot transforms from python/rig.py; the C++ rig code must match
 them within 1 cm (tests/cpp/rig_golden.sh).
+
+python/gen/rigs.apak holds every rig in alia-engine's resource pack format (its docs/formats.md
+type 3), written with its tools/alia_pack.py (ALIA_ENGINE points at the checkout, default
+~/Projects/alia-engine); the engine evaluates the same poses in C++ (tests/test_alia.py).
 """
 
 import argparse
 import json
+import os
 import pprint
 import sys
 from pathlib import Path
@@ -19,6 +24,9 @@ ASSETS = ROOT / "assets"
 sys.path.insert(0, str(ROOT / "python"))
 
 import rig as rigmath  # noqa: E402
+
+sys.path.insert(0, os.path.join(os.environ.get("ALIA_ENGINE", os.path.expanduser("~/Projects/alia-engine")), "tools"))
+from alia_pack import PackWriter  # noqa: E402
 
 GOLDEN_PHASES = (0, 64, 128, 192, 255)
 MAX_BONES, MAX_SLOTS, MAX_ANIMS, MAX_VARIANTS = 16, 32, 16, 4
@@ -176,7 +184,7 @@ def golden(rig):
         entry = {"id": anim["id"], "name": anim["name"], "poses": []}
         for phase in GOLDEN_PHASES:
             poses = rigmath.pose(rig, anim["id"], phase)
-            mats = poses + [rigmath.slot_matrix(rig, poses, s) for s in range(len(rig["slots"]))]
+            mats = list(poses) + [rigmath.slot_matrix(rig, poses, s) for s in range(len(rig["slots"]))]
             points = []
             for m in mats:
                 pts = [rigmath.transform(m, p) for p in ((0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1))]
@@ -207,6 +215,10 @@ def build():
         [f"// {HEADER}", "#pragma once", ""] + includes +
         ["", "namespace gen {", f"constexpr int RIG_COUNT = {len(table)};",
          f"static const Rig* const RIGS[RIG_COUNT] = {{{', '.join(table)}}};  // index = rig_id", "}  // namespace gen", ""])
+    pack = PackWriter()
+    for rig in rigs:
+        pack.add_rig(rig["name"], rig)  # the engine keeps what it uses (no colliders, hp, tags)
+    outputs[ROOT / "python" / "gen" / "rigs.apak"] = pack.bytes()
     outputs[ROOT / "python" / "gen" / "rigs.py"] = "\n".join(
         [f'"""{HEADER}"""', ""] + [f"from gen.rig_{r['name']} import RIG as {r['name'].upper()}" for r in rigs] +
         ["", "RIGS = {" + ", ".join(f"{r['id']}: {r['name'].upper()}" for r in rigs) + "}", ""])
@@ -218,12 +230,13 @@ def main():
     parser.add_argument("--check", action="store_true", help="only report whether the outputs are up to date")
     args = parser.parse_args()
     stale = []
-    for path, text in build().items():
-        if not path.exists() or path.read_text() != text:
+    for path, data in build().items():
+        binary = isinstance(data, bytes)
+        if not path.exists() or (path.read_bytes() if binary else path.read_text()) != data:
             stale.append(path)
             if not args.check:
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(text)
+                path.write_bytes(data) if binary else path.write_text(data)
     for path in stale:
         print(("stale: " if args.check else "wrote: ") + str(path.relative_to(ROOT)))
     if args.check and stale:

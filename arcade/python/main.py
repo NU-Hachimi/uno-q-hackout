@@ -71,18 +71,20 @@ class Megalith:
         self.music = audio.Music()
         self.seq = 0
         self.frame = self.game.step(None, 0.0)  # something to draw before the first step
+        self.view.update(self.frame)
         print(f"Megalith on {engine.describe()}", flush=True)
 
     def fixed_update(self, engine, dt):
         raw = self.demo(self.seq) if self.demo else raw_input(engine.input, self.seq)
         self.frame = self.game.step(raw, dt)
+        self.view.update(self.frame)  # the world follows the logic; the engine interpolates between steps
         if self.game.sky_update(dt):
             self.view.set_sky(*world.sky_at(self.game.day))
         self.music.play(*self.game.music())
         self.seq = (self.seq + 1) & 0xFF
 
     def render(self, engine, alpha):
-        self.view.draw(self.frame)
+        self.view.draw(self.frame)  # the HUD
 
     def shutdown(self, engine):
         self.music.close()

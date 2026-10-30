@@ -1,8 +1,12 @@
-"""Draws a game Frame with alia-engine: the Alia Pad replacement for the MCU renderer (sketch/render.cpp).
+"""Shows a game Frame with alia-engine: the Alia Pad replacement for the MCU renderer (sketch/render.cpp).
 
 Same picture semantics as the MCU (docs/api.md §3, art.md §4): palette meshes graded by the Look, banded
 distance fog, ground fog, the character light, fades, the hook rope and the HUD; at 640x360 instead of
 240x160, with the same horizontal field of view. The game code (game.py and below) does not know about it.
+
+Two halves (docs/alia-port.md): update(frame) runs in every logic step and keeps alia-engine's world in
+step with the Frame (the three rigs as engine rigs, the objects as pooled nodes, the camera, the rope), so
+the engine interpolates them; draw(frame) runs every displayed frame and only draws the HUD.
 """
 
 import math
@@ -13,13 +17,13 @@ from pathlib import Path
 import alia_engine as ae
 
 import g3d
-import rig
 import world
 from gen import mesh_ids
 from gen import palette as pal
 from gen.rigs import RIGS
 
 MESH_PACK = Path(__file__).resolve().parent / "gen" / "meshes.apak"  # alia-engine resource pack (tools/mesh_build.py)
+RIG_PACK = Path(__file__).resolve().parent / "gen" / "rigs.apak"     # its rigs (tools/rig_build.py)
 _LOOK = struct.Struct("<32HBBBbBHHBBB")
 
 # Lights and materials (sketch/render.cpp).
@@ -90,20 +94,6 @@ def grade(c, look):
     return (round(out[0] * 31) << 11) | (round(out[1] * 63) << 5) | round(out[2] * 31)
 
 
-def _model(r, t):
-    """Row-major 3x4 from (R rows, t)."""
-    return (r[0][0], r[0][1], r[0][2], t[0], r[1][0], r[1][1], r[1][2], t[1], r[2][0], r[2][1], r[2][2], t[2])
-
-
-def _object_model(x, y, z, yaw, pitch, scale):
-    """T(pos) · Ry(yaw) · Rx(pitch) · S(scale), as the MCU builds g3d objects."""
-    cy, sy, cp, sp = math.cos(yaw), math.sin(yaw), math.cos(pitch), math.sin(pitch)
-    s = scale
-    return (cy * s, sy * sp * s, sy * cp * s, x,
-            0.0, cp * s, -sp * s, y,
-            -sy * s, cy * sp * s, cy * cp * s, z)
-
-
 def _hash_pick(i, j):
     """Which of the two grass tones a terrain vertex gets (sketch/render.cpp bakeTerrain)."""
     h = ((i * 73856093) & 0xFFFFFFFF) ^ ((j * 19349663) & 0xFFFFFFFF)
@@ -130,6 +120,10 @@ class View:
         # rebuilt when the sky changes, the node stays) and the scattered rocks. Moving things are still
         # drawn per frame until the rigs move into the engine too (E4 step 4).
         engine.world.spawn(self.terrain)
+        self.rigs = engine.load_rigs(str(RIG_PACK))  # by name; the Frame names rigs by id (gen.rigs)
+        self.rig_nodes = {}  # block index -> [rig id, RigNode, hidden, fade, char_light, slot state]
+        self.pool = {}       # mesh id -> nodes for this kind of object
+        self.rope_node = None
         for x, z, yaw, scale, mesh_id, tint in scene.rocks:
             if mesh_id in self.meshes:
                 engine.world.spawn(self.meshes[mesh_id], position=(x, world.terrain_height(scene, x, z), z), yaw=yaw,
@@ -185,8 +179,9 @@ class View:
         f.fog_color = rgb888(grade(fields["fog_color"], params))
         f.sky_span = SKY_SPAN
         fog_near, fog_far = fields["fog_near"] * 2.0, fields["fog_far"] * 2.0
-        f.fog_near, f.fog_full, f.far = fog_near, fog_near + (fog_far - fog_near) * FOG_FULL, fog_far
-        f.near = NEAR_PLANE
+        f.fog_near, f.fog_full = fog_near, fog_near + (fog_far - fog_near) * FOG_FULL
+        cam = self.e.world.camera  # the far plane is the fog's end (the MCU's far clip)
+        cam.near, cam.far = NEAR_PLANE, fog_far
         f.ground_fog, f.ground_top, f.ground_ramp = look[41] / 255.0, GROUND_FOG_TOP, GROUND_FOG_RAMP
         yaw, pitch = (fields[k] * 2 * math.pi / 256 for k in ("light_yaw", "light_pitch"))
         sun = (math.cos(pitch) * math.sin(yaw), math.sin(pitch), math.cos(pitch) * math.cos(yaw))
@@ -195,10 +190,11 @@ class View:
         self._terrain_mesh(grade(fields["grass_a"], params), grade(fields["grass_b"], params))
 
     # ---- one frame ------------------------------------------------------------------------------
-    def draw(self, frame):
-        """Fill this frame's draw list; whoever runs the loop calls end_frame() (alia_engine.run does)."""
+    def update(self, frame):
+        """Every logic step: the world follows this step's Frame (alia-engine interpolates between steps)."""
         e, f, cam = self.e, self.e.frame, frame.camera
-        f.eye, f.yaw, f.pitch, f.fov_x = (cam.x, cam.y, cam.z), cam.yaw, cam.pitch, math.radians(cam.fov)
+        c = e.world.camera
+        c.position, c.yaw, c.pitch, c.fov_x = (cam.x, cam.y, cam.z), cam.yaw, cam.pitch, math.radians(cam.fov)
         f.fog_steps = 0 if frame.flags & g3d.FLAG_NO_FOG else FOG_STEPS
         # Character light: from just above and right of the camera (api.md §3.3).
         fwd = (math.sin(cam.yaw) * math.cos(cam.pitch), math.sin(cam.pitch), math.cos(cam.yaw) * math.cos(cam.pitch))
@@ -210,52 +206,93 @@ class View:
 
         hand = None
         for k, block in enumerate(frame.rigs):
-            hand = self._rig(block, k == 0) or hand
-        for o in frame.objects:
-            self._mesh(o.mesh, _object_model(o.x, o.y, o.z, o.yaw, o.pitch, o.scale), o.tint)
+            hand = self._rig(k, block) or hand
+        self._objects(frame.objects)
         self._rope(frame.hook, hand, cam)
+
+    def draw(self, frame):
+        """Every displayed frame: the HUD (the world draws itself)."""
         if not frame.flags & g3d.FLAG_NO_HUD:
             self._hud(frame.hud)
 
-    def _mesh(self, mesh_id, model, tint=0, light=ae.Light.MATERIAL, fade=0.0):
-        handle = self.meshes.get(mesh_id)
-        if handle:
-            self.e.draw(handle, model, tint=tint, light=light, fade=fade, ground_fog=tint != pal.FLASH)
-
-    def _rig(self, block, boss):
-        """Bones (and for the boss its fitted, living parts); returns the rider's hand position, if any."""
+    def _rig(self, k, block):
+        """Rig block k (0 boss, 1 horse, 2 rider) as an engine rig; returns the rider's hand position, if any."""
+        state = self.rig_nodes.get(k)
         if block is None or block.rig_id not in RIGS or block.fade >= 1:
+            if state and not state[2]:
+                state[1].set_subtree(visible=False)
+                state[2] = True
             return None
-        r = RIGS[block.rig_id]
-        poses = rig.pose(r, block.anim, block.phase)
-        base = rig.rig_to_world(block.x, block.y, block.z, block.yaw)
+        if state is None or state[0] != block.rig_id:
+            if state:
+                state[1].destroy()
+            node = self.e.world.spawn_rig(self.rigs[RIGS[block.rig_id]["name"]])
+            state = self.rig_nodes[k] = [block.rig_id, node, True, None, None, {}]
+        node = state[1]
+        node.position, node.yaw = (block.x, block.y, block.z), block.yaw
+        node.animator.anim, node.animator.phase = block.anim, block.phase
         light = ae.Light.CHARACTER if block.char_light else ae.Light.MATERIAL
-        for bone, local in zip(r["bones"], poses):
-            if bone["mesh_id"] is not None and bone["mesh_id"] != 0xFF:
-                self._mesh(bone["mesh_id"], _model(*rig.compose(base, local)), light=light, fade=block.fade)
-        if boss:
-            for s, slot in enumerate(r["slots"][:32]):
+        if state[2]:  # back from hidden (the horse fading in under the rider): show it, no slide from where it was
+            node.set_subtree(visible=True)
+            node.teleport()
+            state[2] = False
+            state[5].clear()  # the parts' visibility below starts over
+        if state[3] != block.fade or state[4] != light:
+            node.set_subtree(fade=block.fade, light=light)  # not visible: dead parts stay hidden
+            state[3], state[4] = block.fade, light
+        if k == 0:  # the boss: the parts fitted this round, alive, the one just hit flashing
+            r = RIGS[block.rig_id]
+            for s in range(min(len(r["slots"]), 32)):
                 variant = self.scene.slot_variants[s] if s < len(self.scene.slot_variants) else 0
-                if not variant or variant >= len(slot["variant_mesh_ids"]) or not block.part_alive & (1 << s):
+                want = (variant, bool(block.part_alive & (1 << s)), block.hit_slot == s)
+                if state[5].get(s) == want:
                     continue
-                m = rig.compose(base, rig.slot_matrix(r, poses, s))
-                tint = pal.FLASH if block.hit_slot == s else 0
-                self._mesh(slot["variant_mesh_ids"][variant], _model(*m), tint, light, block.fade)
-        if "hand" in r.get("attach", {}):
-            return rig.transform(rig.compose(base, rig.attach_matrix(r, poses, "hand")), (0.0, 0.0, 0.0))
+                slot = node.slot(s)
+                if state[5].get(s, (None,))[0] != variant:
+                    node.slot_variant(s, variant if variant < len(r["slots"][s]["variants"]) else 0)
+                slot.visible = want[1]
+                slot.tint, slot.ground_fog = (pal.FLASH, False) if want[2] else (0, True)
+                state[5][s] = want
+        if "hand" in RIGS[block.rig_id].get("attach", {}):
+            return node.attach_point("hand").world_position
         return None
+
+    def _objects(self, objects):
+        """Bullets, sparks, the hook head, dust rings: pooled nodes by mesh. Objects have no identity from
+        one Frame to the next, so they are placed without blending (teleport)."""
+        used = {}
+        for o in objects:
+            handle = self.meshes.get(o.mesh)
+            if not handle:
+                continue
+            nodes = self.pool.setdefault(o.mesh, [])
+            n = used.get(o.mesh, 0)
+            if n == len(nodes):
+                nodes.append(self.e.world.spawn(handle))
+            node = nodes[n]
+            used[o.mesh] = n + 1
+            node.position, node.scale = (o.x, o.y, o.z), o.scale
+            node.set_rotation(o.yaw, o.pitch, 0.0)
+            node.tint, node.ground_fog, node.visible = o.tint, o.tint != pal.FLASH, True
+            node.teleport()
+        for mesh_id, nodes in self.pool.items():
+            for node in nodes[used.get(mesh_id, 0):]:
+                node.visible = False
 
     def _rope(self, hook, hand, cam):
         """A camera-facing strip from the rider's hand to the hook head (api.md §3.3 Hook block)."""
-        if not hook.flags & 1 or hand is None:
-            return
-        anchor, eye = (hook.x, hook.y, hook.z), (cam.x, cam.y, cam.z)
-        along = [b - a for a, b in zip(hand, anchor)]
-        mid = [(a + b) / 2 - c for a, b, c in zip(hand, anchor, eye)]
-        side = (along[1] * mid[2] - along[2] * mid[1], along[2] * mid[0] - along[0] * mid[2],
-                along[0] * mid[1] - along[1] * mid[0])
-        length = math.sqrt(sum(c * c for c in side))
-        if length < 1e-6:
+        show = bool(hook.flags & 1) and hand is not None
+        if show:
+            anchor, eye = (hook.x, hook.y, hook.z), (cam.x, cam.y, cam.z)
+            along = [b - a for a, b in zip(hand, anchor)]
+            mid = [(a + b) / 2 - c for a, b, c in zip(hand, anchor, eye)]
+            side = (along[1] * mid[2] - along[2] * mid[1], along[2] * mid[0] - along[0] * mid[2],
+                    along[0] * mid[1] - along[1] * mid[0])
+            length = math.sqrt(sum(c * c for c in side))
+            show = length >= 1e-6
+        if not show:
+            if self.rope_node:
+                self.rope_node.visible = False
             return
         side = [c * ROPE_HALF_WIDTH / length for c in side]
         quad = []
@@ -269,7 +306,8 @@ class View:
             self.e.update_mesh(self.rope, mesh)
         else:
             self.rope = self.e.create_mesh(mesh)
-        self.e.draw(self.rope, (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0))
+            self.rope_node = self.e.world.spawn(self.rope)
+        self.rope_node.visible = True
 
     # ---- HUD (sketch/hud.cpp, at twice the pixel size) ------------------------------------------
     def _hud(self, hud):

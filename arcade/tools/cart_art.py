@@ -53,6 +53,7 @@ def shoot(engine, view, game, path, hud=True, steps=1, inputs=raw):
     if not hud:
         frame.flags |= g3d.FLAG_NO_HUD
     view.set_sky(*world.sky_at(game.day))
+    view.update(frame)
     view.draw(frame)
     engine.end_frame()
     engine.screenshot(str(path))
