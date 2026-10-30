@@ -66,7 +66,8 @@ tuning.py     手感参数（原 tilt_config.py + preview.py）
 | 5b 激活、挂载 | 引擎有了 `active`（Unity 语义）、`set_parent(keep_world=True)`、`Rig.attach_position()`。打碎的部件 `slot.active = False`（不画、碰撞体也关）；Ready 时 BOSS 用 `fade = 1`（不画，但还能被打到）；`boss.present()` 只剩淡出和闪烁。Player 持有马和骑手两个 rig：马按原来的规则摆（跟着 PC、跑走淡出、落地前淡入；不在时 `active = False`），骑着的时候骑手挂在马鞍上（`SADDLE_TILT`：跟着马背前后晃，飞奔 4°、受击 14°；`False` 是原来的"直立在马鞍上方"），离开、落回都用 `keep_world`，插值不断。手是骑手的 `hand` 挂点；处决里"打中那一刻手在哪"用 `Rig.attach_position()`。`alia_view.py` 不再管任何 rig，只剩 Frame 里的物体、绳子和 HUD。关掉 `SADDLE_TILT` 时 44 个帧包全部一致；打开时 5 个骑行的帧变了（骑手跟着马背倾斜） | ✅ |
 | 6 粒子 | 火花、碎片换成粒子发射器（去掉 MCU 时代的 `MAX_SPARKS = 4`） | |
 | 7 系统 | `audio.py` 换成引擎的混音器；按键映射用引擎的动作映射 | |
-| 8 收尾 | 去掉 `Frame` 和 `g3d.py`，拆分 `alia_view.py`，改名（`world.py` → `terrain.py` 等） | |
+| 6b 清理 | `rig.py` 回到简单好读的参考实现（去掉姿态缓存和手工展开）；引擎的黄金姿态存成固定文件 | |
+| 8 收尾 | **MCU 那条路整个去掉**（原版留在 `main` 分支）：`sketch/`、`tests/cpp/`、`scripts/flash.sh`、`mesh_build.py` / `rig_build.py` 生成的 C 头文件、`g3d.py`（不只是协议：`RawInput`、`Camera`、`Obj`、`Hud`、按键常量是玩法和画面之间传的数据类型，要换成游戏自己的类型或者直接读引擎的输入）、`Frame`、快照里的 `.frame` 包。**先换回归手段**：`.frame` 包逐字节一致是现在最严的检查，删掉之前 `snapshot.py` 改成每个关键帧转储一份游戏状态（PC、BOSS、相机、物体，JSON），比对它和截图。然后拆分 `alia_view.py`，改名（`world.py` → `terrain.py` 等）。`retroarch/` 和 Megalith 无关（比赛的另一个演示），留着 | |
 
 ## 5. 怎么验收
 
